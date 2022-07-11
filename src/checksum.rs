@@ -31,7 +31,8 @@ pub struct FileInfo {
 }
 
 impl FileInfo {
-    #[allow(dead_code)]
+    // TODO: Make this return a Result (and use Result::and_then() to call it
+    // in the walker)
     pub fn for_file<P: AsRef<Path>>(path: P, basepath: P) -> FileInfo {
         let relpath = match path.as_ref().strip_prefix(PathBuf::from(basepath.as_ref())) {
             Ok(p) => p,
