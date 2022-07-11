@@ -24,36 +24,6 @@ pub enum ZarrEntry {
     },
 }
 
-pub struct FileInfo {
-    pub path: PathBuf,
-    pub digest: String,
-    pub size: u64,
-}
-
-impl FileInfo {
-    // TODO: Make this return a Result (and use Result::and_then() to call it
-    // in the walker)
-    pub fn for_file<P: AsRef<Path>>(path: P, basepath: P) -> FileInfo {
-        let relpath = match path.as_ref().strip_prefix(PathBuf::from(basepath.as_ref())) {
-            Ok(p) => p,
-            Err(_) => panic!(
-                "Path {:?} is not a descendant of {:?}",
-                path.as_ref(),
-                basepath.as_ref()
-            ),
-        };
-        let size = match fs::metadata(path.as_ref()) {
-            Ok(m) => m.len(),
-            Err(e) => panic!("Could not get size of {:?}: {e}", path.as_ref()),
-        };
-        FileInfo {
-            path: relpath.into(),
-            digest: md5_file(&path),
-            size,
-        }
-    }
-}
-
 impl ZarrEntry {
     pub fn new() -> Self {
         ZarrEntry::directory()
@@ -96,6 +66,7 @@ impl ZarrEntry {
         }
     }
 
+    // Should this return a Result?
     pub fn add_path<P: AsRef<Path>>(&mut self, path: P, digest: &str, size: u64) {
         match self {
             ZarrEntry::File { .. } => panic!("Cannot add a path to a file"),
@@ -164,6 +135,36 @@ impl FromIterator<FileInfo> for ZarrEntry {
     }
 }
 
+pub struct FileInfo {
+    pub path: PathBuf,
+    pub digest: String,
+    pub size: u64,
+}
+
+impl FileInfo {
+    // TODO: Make this return a Result (and use Result::and_then() to call it
+    // in the walker)
+    pub fn for_file<P: AsRef<Path>>(path: P, basepath: P) -> FileInfo {
+        let relpath = match path.as_ref().strip_prefix(PathBuf::from(basepath.as_ref())) {
+            Ok(p) => p,
+            Err(_) => panic!(
+                "Path {:?} is not a descendant of {:?}",
+                path.as_ref(),
+                basepath.as_ref()
+            ),
+        };
+        let size = match fs::metadata(path.as_ref()) {
+            Ok(m) => m.len(),
+            Err(e) => panic!("Could not get size of {:?}: {e}", path.as_ref()),
+        };
+        FileInfo {
+            path: relpath.into(),
+            digest: md5_file(&path),
+            size,
+        }
+    }
+}
+
 pub fn get_checksum(
     files: HashMap<String, ZarrDigest>,
     directories: HashMap<String, ZarrDigest>,
@@ -187,6 +188,7 @@ pub fn md5_string(s: &str) -> String {
     tohex(&(Md5::new().chain_update(s).finalize()))
 }
 
+// TODO: Return a Result
 pub fn md5_file<P: AsRef<Path>>(path: &P) -> String {
     let mut file = match fs::File::open(path) {
         Ok(f) => f,
