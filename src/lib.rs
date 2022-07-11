@@ -2,16 +2,17 @@ pub mod checksum;
 pub mod checksum_json;
 use crate::checksum::{get_checksum, FileInfo, ZarrDigest, ZarrEntry};
 use clap::ValueEnum;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fs;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, ValueEnum)]
 pub enum Walker {
     Walkdir,
     Recursive,
+    DepthFirst,
 }
 
 impl Walker {
@@ -19,6 +20,7 @@ impl Walker {
         match self {
             Walker::Walkdir => walkdir_checksum(dirpath),
             Walker::Recursive => recursive_checksum(dirpath),
+            Walker::DepthFirst => depth_first_checksum(dirpath),
         }
     }
 }
@@ -64,4 +66,57 @@ pub fn recursive_checksum<P: AsRef<Path>>(dirpath: P) -> String {
     }
 
     recurse(&dirpath, &dirpath).unwrap().digest
+}
+
+// TODO: Return a Result
+pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> String {
+    let zarr: Result<ZarrEntry, _> = DepthFirstIterator::new(dirpath.as_ref())
+        .map(|r| r.map(|p| FileInfo::for_file(p, dirpath.as_ref().into())))
+        .collect();
+    match zarr {
+        Ok(z) => z.digest().digest,
+        Err(e) => panic!("Error walking Zarr: {e}"),
+    }
+}
+
+struct DepthFirstIterator {
+    queue: VecDeque<PathBuf>,
+}
+
+impl DepthFirstIterator {
+    fn new<P: AsRef<Path>>(dirpath: P) -> Self {
+        let mut queue = VecDeque::new();
+        queue.push_back(dirpath.as_ref().into());
+        DepthFirstIterator { queue }
+    }
+}
+
+impl Iterator for DepthFirstIterator {
+    type Item = Result<PathBuf, io::Error>;
+
+    fn next(&mut self) -> Option<Result<PathBuf, io::Error>> {
+        loop {
+            let path = self.queue.pop_front()?;
+            match fs::metadata(&path) {
+                Ok(m) => {
+                    if m.is_dir() {
+                        match fs::read_dir(&path) {
+                            Ok(iter) => {
+                                for p in iter {
+                                    match p {
+                                        Ok(entry) => self.queue.push_back(entry.path()),
+                                        Err(e) => return Some(Err(e)),
+                                    }
+                                }
+                            }
+                            Err(e) => return Some(Err(e)),
+                        }
+                    } else {
+                        return Some(Ok(path));
+                    }
+                }
+                Err(e) => return Some(Err(e)),
+            }
+        }
+    }
 }
