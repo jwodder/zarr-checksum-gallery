@@ -26,6 +26,12 @@ pub enum ZarrEntry {
     },
 }
 
+pub struct FileInfo {
+    pub path: PathBuf,
+    pub digest: String,
+    pub size: u64,
+}
+
 impl ZarrEntry {
     pub fn file(name: &str, digest: ZarrDigest) -> Self {
         ZarrEntry::File {
@@ -72,7 +78,7 @@ impl ZarrEntry {
         }
     }
 
-    pub fn add_file<P: AsRef<Path>>(&mut self, path: P, digest: &str, size: u64) {
+    pub fn add_path<P: AsRef<Path>>(&mut self, path: P, digest: &str, size: u64) {
         match self {
             ZarrEntry::File { .. } => panic!("Cannot add a path to a file"),
             ZarrEntry::Directory { children, .. } => {
@@ -120,6 +126,20 @@ impl ZarrEntry {
                 }
             }
         }
+    }
+
+    pub fn add_file_info(&mut self, info: FileInfo) {
+        self.add_path(info.path, &info.digest, info.size);
+    }
+}
+
+impl FromIterator<FileInfo> for ZarrEntry {
+    fn from_iter<I: IntoIterator<Item = FileInfo>>(iter: I) -> Self {
+        let mut zarr = ZarrEntry::directory("");
+        for info in iter {
+            zarr.add_file_info(info);
+        }
+        zarr
     }
 }
 
@@ -270,11 +290,47 @@ mod test {
     #[test]
     fn test_tree_digest() {
         let mut sample = ZarrEntry::directory("sample.zarr");
-        sample.add_file("arr_0/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315);
-        sample.add_file("arr_0/0", "ed4e934a474f1d2096846c6248f18c00", 431);
-        sample.add_file("arr_1/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315);
-        sample.add_file("arr_1/0", "fba4dee03a51bde314e9713b00284a93", 431);
-        sample.add_file(".zgroup", "e20297935e73dd0154104d4ea53040ab", 24);
+        sample.add_path("arr_0/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315);
+        sample.add_path("arr_0/0", "ed4e934a474f1d2096846c6248f18c00", 431);
+        sample.add_path("arr_1/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315);
+        sample.add_path("arr_1/0", "fba4dee03a51bde314e9713b00284a93", 431);
+        sample.add_path(".zgroup", "e20297935e73dd0154104d4ea53040ab", 24);
+        assert_eq!(
+            sample.digest().digest,
+            "4313ab36412db2981c3ed391b38604d6-5--1516"
+        );
+    }
+
+    #[test]
+    fn test_from_iter() {
+        let files = vec![
+            FileInfo {
+                path: "arr_0/.zarray".into(),
+                digest: "9e30a0a1a465e24220d4132fdd544634".into(),
+                size: 315,
+            },
+            FileInfo {
+                path: "arr_0/0".into(),
+                digest: "ed4e934a474f1d2096846c6248f18c00".into(),
+                size: 431,
+            },
+            FileInfo {
+                path: "arr_1/.zarray".into(),
+                digest: "9e30a0a1a465e24220d4132fdd544634".into(),
+                size: 315,
+            },
+            FileInfo {
+                path: "arr_1/0".into(),
+                digest: "fba4dee03a51bde314e9713b00284a93".into(),
+                size: 431,
+            },
+            FileInfo {
+                path: ".zgroup".into(),
+                digest: "e20297935e73dd0154104d4ea53040ab".into(),
+                size: 24,
+            },
+        ];
+        let sample = ZarrEntry::from_iter(files);
         assert_eq!(
             sample.digest().digest,
             "4313ab36412db2981c3ed391b38604d6-5--1516"
