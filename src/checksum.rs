@@ -72,7 +72,7 @@ impl ZarrEntry {
         }
     }
 
-    pub fn add_file_digest(&mut self, path: &PathBuf, digest: ZarrDigest) {
+    pub fn add_file(&mut self, path: &PathBuf, digest: &str, size: u64) {
         match self {
             ZarrEntry::File { .. } => panic!("Cannot add a path to a file"),
             ZarrEntry::Directory { children, .. } => {
@@ -104,7 +104,14 @@ impl ZarrEntry {
                         ZarrEntry::Directory { children, .. } => d = children,
                     }
                 }
-                let entry = ZarrEntry::file(&basename, digest);
+                let entry = ZarrEntry::file(
+                    &basename,
+                    ZarrDigest {
+                        digest: digest.to_string(),
+                        size,
+                        file_count: 1,
+                    },
+                );
                 if d.insert(basename, entry).is_some() {
                     panic!("File {} encountered twice", path.display());
                 }

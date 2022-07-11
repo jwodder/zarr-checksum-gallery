@@ -125,13 +125,35 @@ mod test {
     #[test]
     fn test_checksum_json() {
         let files = HashMap::from([
-            ("foo".to_string(), ZarrDigest {digest: "0123456789abcdef0123456789abcdef".to_string(), size: 69105, file_count: 1}),
-            ("bar".to_string(), ZarrDigest {digest: "abcdef0123456789abcdef0123456789".to_string(), size: 42, file_count: 1}),
+            (
+                "foo".to_string(),
+                ZarrDigest {
+                    digest: "0123456789abcdef0123456789abcdef".to_string(),
+                    size: 69105,
+                    file_count: 1,
+                },
+            ),
+            (
+                "bar".to_string(),
+                ZarrDigest {
+                    digest: "abcdef0123456789abcdef0123456789".to_string(),
+                    size: 42,
+                    file_count: 1,
+                },
+            ),
         ]);
-        let directories = HashMap::from([
-            ("quux".to_string(), ZarrDigest {digest: "0987654321fedcba0987654321fedcba".to_string(), size: 65537, file_count: 23})
-        ]);
+        let directories = HashMap::from([(
+            "quux".to_string(),
+            ZarrDigest {
+                digest: "0987654321fedcba0987654321fedcba".to_string(),
+                size: 65537,
+                file_count: 23,
+            },
+        )]);
         let json = get_checksum_json(&files, &directories);
-        assert_eq!(json, r#"{"directories":[{"digest":"0987654321fedcba0987654321fedcba","name":"quux","size":65537}],"files":[{"digest":"abcdef0123456789abcdef0123456789","name":"bar","size":42},{"digest":"0123456789abcdef0123456789abcdef","name":"foo","size":69105}]}"#);
+        assert_eq!(
+            json,
+            r#"{"directories":[{"digest":"0987654321fedcba0987654321fedcba","name":"quux","size":65537}],"files":[{"digest":"abcdef0123456789abcdef0123456789","name":"bar","size":42},{"digest":"0123456789abcdef0123456789abcdef","name":"foo","size":69105}]}"#
+        );
     }
 }
