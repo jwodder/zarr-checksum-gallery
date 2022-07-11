@@ -2,6 +2,37 @@ use crate::checksum::ZarrDigest;
 use std::collections::HashMap;
 use std::fmt::{Error, Write};
 
+pub fn get_checksum_json(
+    files: &HashMap<String, ZarrDigest>,
+    directories: &HashMap<String, ZarrDigest>,
+) -> String {
+    let mut filevec = Vec::new();
+    for (name, digest) in files.iter() {
+        filevec.push(ZarrChecksum {
+            name: name.clone(),
+            digest: digest.digest.clone(),
+            size: digest.size,
+        });
+    }
+    filevec.sort();
+    let mut dirvec = Vec::new();
+    for (name, digest) in directories.iter() {
+        dirvec.push(ZarrChecksum {
+            name: name.clone(),
+            digest: digest.digest.clone(),
+            size: digest.size,
+        });
+    }
+    dirvec.sort();
+    let collection = ZarrChecksumCollection {
+        directories: dirvec,
+        files: filevec,
+    };
+    let mut buf = String::new();
+    collection.write_json(&mut buf).unwrap();
+    buf
+}
+
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct ZarrChecksum {
     name: String,
@@ -47,42 +78,11 @@ impl ZarrChecksumCollection {
     }
 }
 
-pub fn get_checksum_json(
-    files: &HashMap<String, ZarrDigest>,
-    directories: &HashMap<String, ZarrDigest>,
-) -> String {
-    let mut filevec = Vec::new();
-    for (name, digest) in files.iter() {
-        filevec.push(ZarrChecksum {
-            name: name.clone(),
-            digest: digest.digest.clone(),
-            size: digest.size,
-        });
-    }
-    filevec.sort();
-    let mut dirvec = Vec::new();
-    for (name, digest) in directories.iter() {
-        dirvec.push(ZarrChecksum {
-            name: name.clone(),
-            digest: digest.digest.clone(),
-            size: digest.size,
-        });
-    }
-    dirvec.sort();
-    let collection = ZarrChecksumCollection {
-        directories: dirvec,
-        files: filevec,
-    };
-    let mut buf = String::new();
-    collection.write_json(&mut buf).unwrap();
-    buf
-}
-
 fn write_json_str<W: Write>(s: &str, writer: &mut W) -> Result<(), Error> {
     writer.write_char('"')?;
     for c in s.chars() {
         match c {
-            '"' => writer.write_str("\"")?,
+            '"' => writer.write_str("\\\"")?,
             '\\' => writer.write_str(r"\\")?,
             '\x08' => writer.write_str("\\b")?,
             '\x0C' => writer.write_str("\\f")?,
@@ -100,4 +100,38 @@ fn write_json_str<W: Write>(s: &str, writer: &mut W) -> Result<(), Error> {
     }
     writer.write_char('"')?;
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case("foobar", r#""foobar""#)]
+    #[case("foo / bar", r#""foo / bar""#)]
+    #[case("foo\"bar", r#""foo\"bar""#)]
+    #[case("foo\\bar", r#""foo\\bar""#)]
+    #[case("foo\x08\x0C\n\r\tbar", r#""foo\b\f\n\r\tbar""#)]
+    #[case("foo\x0B\x1B\x7Fbar", r#""foo\u000b\u001b\u007fbar""#)]
+    #[case("foo—bar", r#""foo\u2014bar""#)]
+    #[case("foo🐐bar", r#""foo\ud83d\udc10bar""#)]
+    fn test_write_json_str(#[case] s: &str, #[case] json: String) {
+        let mut buf = String::new();
+        write_json_str(s, &mut buf).unwrap();
+        assert_eq!(buf, json);
+    }
+
+    #[test]
+    fn test_checksum_json() {
+        let files = HashMap::from([
+            ("foo".to_string(), ZarrDigest {digest: "0123456789abcdef0123456789abcdef".to_string(), size: 69105, file_count: 1}),
+            ("bar".to_string(), ZarrDigest {digest: "abcdef0123456789abcdef0123456789".to_string(), size: 42, file_count: 1}),
+        ]);
+        let directories = HashMap::from([
+            ("quux".to_string(), ZarrDigest {digest: "0987654321fedcba0987654321fedcba".to_string(), size: 65537, file_count: 23})
+        ]);
+        let json = get_checksum_json(&files, &directories);
+        assert_eq!(json, r#"{"directories":[{"digest":"0987654321fedcba0987654321fedcba","name":"quux","size":65537}],"files":[{"digest":"abcdef0123456789abcdef0123456789","name":"bar","size":42},{"digest":"0123456789abcdef0123456789abcdef","name":"foo","size":69105}]}"#);
+    }
 }

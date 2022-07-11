@@ -6,3 +6,6 @@ edition = "2021"
 [dependencies]
 base16ct = { version = "0.1.1", features = ["alloc"] }
 md-5 = "0.10.1"
+
+[dev-dependencies]
+rstest = "0.15.0"
