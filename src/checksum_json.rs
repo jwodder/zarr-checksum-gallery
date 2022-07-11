@@ -126,26 +126,26 @@ mod test {
     fn test_checksum_json() {
         let files = HashMap::from([
             (
-                "foo".to_string(),
+                "foo".into(),
                 ZarrDigest {
-                    digest: "0123456789abcdef0123456789abcdef".to_string(),
+                    digest: "0123456789abcdef0123456789abcdef".into(),
                     size: 69105,
                     file_count: 1,
                 },
             ),
             (
-                "bar".to_string(),
+                "bar".into(),
                 ZarrDigest {
-                    digest: "abcdef0123456789abcdef0123456789".to_string(),
+                    digest: "abcdef0123456789abcdef0123456789".into(),
                     size: 42,
                     file_count: 1,
                 },
             ),
         ]);
         let directories = HashMap::from([(
-            "quux".to_string(),
+            "quux".into(),
             ZarrDigest {
-                digest: "0987654321fedcba0987654321fedcba".to_string(),
+                digest: "0987654321fedcba0987654321fedcba".into(),
                 size: 65537,
                 file_count: 23,
             },

@@ -149,3 +149,118 @@ pub fn md5_file<P: AsRef<Path>>(path: &P) -> String {
     io::copy(&mut file, &mut hasher).unwrap();
     tohex(&hasher.finalize())
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_get_checksum_nothing() {
+        let files = HashMap::new();
+        let directories = HashMap::new();
+        let digest = get_checksum(files, directories);
+        assert_eq!(digest.digest, "481a2f77ab786a0f45aafd5db0971caa-0--0");
+    }
+
+    #[test]
+    fn test_get_checksum_one_file() {
+        let files = HashMap::from([(
+            "bar".into(),
+            ZarrDigest {
+                digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+                size: 1,
+                file_count: 1,
+            },
+        )]);
+        let directories = HashMap::new();
+        let digest = get_checksum(files, directories);
+        assert_eq!(digest.digest, "f21b9b4bf53d7ce1167bcfae76371e59-1--1");
+    }
+
+    #[test]
+    fn test_get_checksum_one_directory() {
+        let files = HashMap::new();
+        let directories = HashMap::from([(
+            "bar".into(),
+            ZarrDigest {
+                digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-1--1".into(),
+                size: 1,
+                file_count: 1,
+            },
+        )]);
+        let digest = get_checksum(files, directories);
+        assert_eq!(digest.digest, "ea8b8290b69b96422a3ed1cca0390f21-1--1");
+    }
+
+    #[test]
+    fn test_get_checksum_two_files() {
+        let files = HashMap::from([
+            (
+                "bar".into(),
+                ZarrDigest {
+                    digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+                    size: 1,
+                    file_count: 1,
+                },
+            ),
+            (
+                "baz".into(),
+                ZarrDigest {
+                    digest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
+                    size: 1,
+                    file_count: 1,
+                },
+            ),
+        ]);
+        let directories = HashMap::new();
+        let digest = get_checksum(files, directories);
+        assert_eq!(digest.digest, "8e50add2b46d3a6389e2d9d0924227fb-2--2");
+    }
+
+    #[test]
+    fn test_get_checksum_two_directories() {
+        let files = HashMap::new();
+        let directories = HashMap::from([
+            (
+                "bar".into(),
+                ZarrDigest {
+                    digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-1--1".into(),
+                    size: 1,
+                    file_count: 1,
+                },
+            ),
+            (
+                "baz".into(),
+                ZarrDigest {
+                    digest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-1--1".into(),
+                    size: 1,
+                    file_count: 1,
+                },
+            ),
+        ]);
+        let digest = get_checksum(files, directories);
+        assert_eq!(digest.digest, "4c21a113688f925240549b14136d61ff-2--2");
+    }
+
+    #[test]
+    fn test_get_checksum_one_of_each() {
+        let files = HashMap::from([(
+            "baz".into(),
+            ZarrDigest {
+                digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+                size: 1,
+                file_count: 1,
+            },
+        )]);
+        let directories = HashMap::from([(
+            "bar".into(),
+            ZarrDigest {
+                digest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-1--1".into(),
+                size: 1,
+                file_count: 1,
+            },
+        )]);
+        let digest = get_checksum(files, directories);
+        assert_eq!(digest.digest, "d5e4eb5dc8efdb54ff089db1eef34119-2--2");
+    }
+}
