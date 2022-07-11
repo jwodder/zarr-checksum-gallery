@@ -163,6 +163,14 @@ impl FileInfo {
             size,
         }
     }
+
+    pub fn to_zarr_digest(&self) -> ZarrDigest {
+        ZarrDigest {
+            digest: self.digest.clone(),
+            size: self.size,
+            file_count: 1,
+        }
+    }
 }
 
 pub fn get_checksum(
