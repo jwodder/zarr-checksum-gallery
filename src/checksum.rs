@@ -2,6 +2,7 @@ use crate::checksum_json::get_checksum_json;
 use base16ct::lower::encode_string as tohex;
 use md5::{Digest, Md5};
 use std::collections::HashMap;
+use std::fmt;
 use std::fs;
 use std::io;
 use std::iter::Iterator;
@@ -12,6 +13,12 @@ pub struct ZarrDigest {
     pub digest: String,
     pub size: u64,
     pub file_count: usize,
+}
+
+impl fmt::Display for ZarrDigest {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.digest)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
