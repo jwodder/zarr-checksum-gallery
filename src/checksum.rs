@@ -17,11 +17,9 @@ pub struct ZarrDigest {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ZarrEntry {
     File {
-        name: String,
         digest: ZarrDigest,
     },
     Directory {
-        name: String,
         children: HashMap<String, ZarrEntry>,
     },
 }
@@ -56,24 +54,13 @@ impl FileInfo {
 }
 
 impl ZarrEntry {
-    pub fn file(name: &str, digest: ZarrDigest) -> Self {
-        ZarrEntry::File {
-            name: name.into(),
-            digest,
-        }
+    pub fn file(digest: ZarrDigest) -> Self {
+        ZarrEntry::File { digest }
     }
 
-    pub fn directory(name: &str) -> Self {
+    pub fn directory() -> Self {
         ZarrEntry::Directory {
-            name: name.into(),
             children: HashMap::new(),
-        }
-    }
-
-    pub fn name(&self) -> String {
-        match self {
-            ZarrEntry::File { name, .. } => name.clone(),
-            ZarrEntry::Directory { name, .. } => name.clone(),
         }
     }
 
@@ -82,12 +69,15 @@ impl ZarrEntry {
             ZarrEntry::File { digest, .. } => digest.clone(),
             ZarrEntry::Directory { children, .. } => {
                 let (files, directories): (Vec<_>, Vec<_>) =
-                    children.values().partition(|e| e.is_file());
+                    children.iter().partition(|(_, v)| v.is_file());
                 get_checksum(
-                    files.into_iter().map(|e| (e.name(), e.digest())).collect(),
+                    files
+                        .into_iter()
+                        .map(|(k, v)| (k.clone(), v.digest()))
+                        .collect(),
                     directories
                         .into_iter()
-                        .map(|e| (e.name(), e.digest()))
+                        .map(|(k, v)| (k.clone(), v.digest()))
                         .collect(),
                 )
             }
@@ -128,7 +118,7 @@ impl ZarrEntry {
                     dpath.push(&dirname);
                     match d
                         .entry(dirname.clone())
-                        .or_insert_with(|| ZarrEntry::directory(&dirname))
+                        .or_insert_with(ZarrEntry::directory)
                     {
                         ZarrEntry::File { .. } => {
                             panic!("Path type conflict for {}", dpath.display())
@@ -136,14 +126,11 @@ impl ZarrEntry {
                         ZarrEntry::Directory { children, .. } => d = children,
                     }
                 }
-                let entry = ZarrEntry::file(
-                    &basename,
-                    ZarrDigest {
-                        digest: digest.to_string(),
-                        size,
-                        file_count: 1,
-                    },
-                );
+                let entry = ZarrEntry::file(ZarrDigest {
+                    digest: digest.to_string(),
+                    size,
+                    file_count: 1,
+                });
                 if d.insert(basename, entry).is_some() {
                     panic!("File {} encountered twice", path.as_ref().display());
                 }
@@ -158,7 +145,7 @@ impl ZarrEntry {
 
 impl FromIterator<FileInfo> for ZarrEntry {
     fn from_iter<I: IntoIterator<Item = FileInfo>>(iter: I) -> Self {
-        let mut zarr = ZarrEntry::directory("");
+        let mut zarr = ZarrEntry::directory();
         for info in iter {
             zarr.add_file_info(info);
         }
@@ -318,7 +305,7 @@ mod test {
 
     #[test]
     fn test_tree_digest() {
-        let mut sample = ZarrEntry::directory("sample.zarr");
+        let mut sample = ZarrEntry::directory();
         sample.add_path("arr_0/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315);
         sample.add_path("arr_0/0", "ed4e934a474f1d2096846c6248f18c00", 431);
         sample.add_path("arr_1/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315);
