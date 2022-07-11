@@ -54,6 +54,10 @@ impl FileInfo {
 }
 
 impl ZarrEntry {
+    pub fn new() -> Self {
+        ZarrEntry::directory()
+    }
+
     pub fn file(digest: ZarrDigest) -> Self {
         ZarrEntry::File { digest }
     }
@@ -140,6 +144,12 @@ impl ZarrEntry {
 
     pub fn add_file_info(&mut self, info: FileInfo) {
         self.add_path(info.path, &info.digest, info.size);
+    }
+}
+
+impl Default for ZarrEntry {
+    fn default() -> Self {
+        ZarrEntry::new()
     }
 }
 
