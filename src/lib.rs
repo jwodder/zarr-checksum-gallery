@@ -1,11 +1,27 @@
 pub mod checksum;
 pub mod checksum_json;
 use crate::checksum::{get_checksum, FileInfo, ZarrDigest, ZarrEntry};
+use clap::ValueEnum;
 use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::Path;
 use walkdir::WalkDir;
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, ValueEnum)]
+pub enum Walker {
+    Walkdir,
+    Recursive,
+}
+
+impl Walker {
+    pub fn run<P: AsRef<Path>>(&self, dirpath: P) -> String {
+        match self {
+            Walker::Walkdir => walkdir_checksum(dirpath),
+            Walker::Recursive => recursive_checksum(dirpath),
+        }
+    }
+}
 
 // TODO: Return a Result
 pub fn walkdir_checksum<P: AsRef<Path>>(dirpath: P) -> String {

@@ -1,9 +1,16 @@
-use dandi_zarr_checksum::walkdir_checksum;
-use std::env::args;
+use clap::Parser;
+use dandi_zarr_checksum::Walker;
+use std::path::PathBuf;
+
+#[derive(Clone, Debug, Eq, Parser, PartialEq)]
+#[clap(version)]
+struct Arguments {
+    #[clap(value_enum)]
+    walker: Walker,
+    dirpath: PathBuf,
+}
 
 fn main() {
-    match args().nth(1) {
-        Some(p) => println!("{}", walkdir_checksum(p)),
-        None => panic!("No directory path provided"),
-    }
+    let args = Arguments::parse();
+    println!("{}", args.walker.run(args.dirpath));
 }
