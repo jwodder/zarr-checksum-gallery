@@ -32,7 +32,7 @@ pub struct FileInfo {
 
 impl FileInfo {
     #[allow(dead_code)]
-    fn for_file<P: AsRef<Path>>(path: P, basepath: P) -> FileInfo {
+    pub fn for_file<P: AsRef<Path>>(path: P, basepath: P) -> FileInfo {
         let relpath = match path.as_ref().strip_prefix(PathBuf::from(basepath.as_ref())) {
             Ok(p) => p,
             Err(_) => panic!(
