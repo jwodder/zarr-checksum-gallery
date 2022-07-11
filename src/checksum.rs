@@ -32,6 +32,29 @@ pub struct FileInfo {
     pub size: u64,
 }
 
+impl FileInfo {
+    #[allow(dead_code)]
+    fn for_file<P: AsRef<Path>>(path: P, basepath: P) -> FileInfo {
+        let relpath = match path.as_ref().strip_prefix(PathBuf::from(basepath.as_ref())) {
+            Ok(p) => p,
+            Err(_) => panic!(
+                "Path {:?} is not a descendant of {:?}",
+                path.as_ref(),
+                basepath.as_ref()
+            ),
+        };
+        let size = match fs::metadata(path.as_ref()) {
+            Ok(m) => m.len(),
+            Err(e) => panic!("Could not get size of {:?}: {e}", path.as_ref()),
+        };
+        FileInfo {
+            path: relpath.into(),
+            digest: md5_file(&path),
+            size,
+        }
+    }
+}
+
 impl ZarrEntry {
     pub fn file(name: &str, digest: ZarrDigest) -> Self {
         ZarrEntry::File {
@@ -167,9 +190,15 @@ pub fn md5_string(s: &str) -> String {
 }
 
 pub fn md5_file<P: AsRef<Path>>(path: &P) -> String {
-    let mut file = fs::File::open(path).unwrap();
+    let mut file = match fs::File::open(path) {
+        Ok(f) => f,
+        Err(e) => panic!("Error opening {:?}: {e}", path.as_ref()),
+    };
     let mut hasher = Md5::new();
-    io::copy(&mut file, &mut hasher).unwrap();
+    match io::copy(&mut file, &mut hasher) {
+        Ok(_) => (),
+        Err(e) => panic!("Error reading {:?}: {e}", path.as_ref()),
+    };
     tohex(&hasher.finalize())
 }
 
