@@ -80,13 +80,13 @@ pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> String {
 }
 
 struct DepthFirstIterator {
-    queue: VecDeque<PathBuf>,
+    queue: VecDeque<Result<PathBuf, io::Error>>,
 }
 
 impl DepthFirstIterator {
     fn new<P: AsRef<Path>>(dirpath: P) -> Self {
         let mut queue = VecDeque::new();
-        queue.push_back(dirpath.as_ref().into());
+        queue.push_back(Ok(dirpath.as_ref().into()));
         DepthFirstIterator { queue }
     }
 }
@@ -97,24 +97,21 @@ impl Iterator for DepthFirstIterator {
     fn next(&mut self) -> Option<Result<PathBuf, io::Error>> {
         loop {
             let path = self.queue.pop_front()?;
-            match fs::metadata(&path) {
-                Ok(m) => {
-                    if m.is_dir() {
-                        match fs::read_dir(&path) {
-                            Ok(iter) => {
-                                for p in iter {
-                                    match p {
-                                        Ok(entry) => self.queue.push_back(entry.path()),
-                                        Err(e) => return Some(Err(e)),
-                                    }
-                                }
+            // TODO: Try to simplify this code
+            match path {
+                Ok(path) => match fs::metadata(&path) {
+                    Ok(m) => {
+                        if m.is_dir() {
+                            match fs::read_dir(&path) {
+                                Ok(iter) => self.queue.extend(iter.map(|r| r.map(|e| e.path()))),
+                                Err(e) => return Some(Err(e)),
                             }
-                            Err(e) => return Some(Err(e)),
+                        } else {
+                            return Some(Ok(path));
                         }
-                    } else {
-                        return Some(Ok(path));
                     }
-                }
+                    Err(e) => return Some(Err(e)),
+                },
                 Err(e) => return Some(Err(e)),
             }
         }
