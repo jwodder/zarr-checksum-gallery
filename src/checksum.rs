@@ -164,9 +164,13 @@ impl FileInfo {
             Ok(m) => m.len(),
             Err(e) => panic!("Could not get size of {:?}: {e}", path.as_ref()),
         };
+        let digest = match md5_file(&path) {
+            Ok(d) => d,
+            Err(e) => panic!("Failed to digest {:?}: {e}", path.as_ref()),
+        };
         FileInfo {
             path: relpath.into(),
-            digest: md5_file(&path),
+            digest,
             size,
         }
     }
@@ -203,18 +207,11 @@ pub fn md5_string(s: &str) -> String {
     tohex(&(Md5::new().chain_update(s).finalize()))
 }
 
-// TODO: Return a Result
-pub fn md5_file<P: AsRef<Path>>(path: &P) -> String {
-    let mut file = match fs::File::open(path) {
-        Ok(f) => f,
-        Err(e) => panic!("Error opening {:?}: {e}", path.as_ref()),
-    };
+pub fn md5_file<P: AsRef<Path>>(path: &P) -> Result<String, io::Error> {
+    let mut file = fs::File::open(path)?;
     let mut hasher = Md5::new();
-    match io::copy(&mut file, &mut hasher) {
-        Ok(_) => (),
-        Err(e) => panic!("Error reading {:?}: {e}", path.as_ref()),
-    };
-    tohex(&hasher.finalize())
+    io::copy(&mut file, &mut hasher)?;
+    Ok(tohex(&hasher.finalize()))
 }
 
 #[cfg(test)]
