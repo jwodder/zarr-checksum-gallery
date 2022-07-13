@@ -21,9 +21,9 @@ struct DepthFirstIterator {
 
 impl DepthFirstIterator {
     fn new<P: AsRef<Path>>(dirpath: P) -> Self {
-        let mut queue = VecDeque::new();
-        queue.push_back(Ok(dirpath.as_ref().into()));
-        DepthFirstIterator { queue }
+        DepthFirstIterator {
+            queue: VecDeque::from([Ok(dirpath.as_ref().into())]),
+        }
     }
 }
 
