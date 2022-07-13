@@ -216,7 +216,7 @@ pub fn md5_string(s: &str) -> String {
     hex::encode(&(Md5::new().chain_update(s).finalize()))
 }
 
-pub fn md5_file<P: AsRef<Path>>(path: &P) -> Result<String, io::Error> {
+pub fn md5_file<P: AsRef<Path>>(path: P) -> Result<String, io::Error> {
     let mut file = fs::File::open(path)?;
     let mut hasher = Md5::new();
     io::copy(&mut file, &mut hasher)?;
