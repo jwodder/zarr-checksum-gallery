@@ -1,5 +1,4 @@
 use crate::checksum_json::get_checksum_json;
-use base16ct::lower::encode_string as tohex;
 use md5::{Digest, Md5};
 use std::collections::HashMap;
 use std::fmt;
@@ -214,14 +213,14 @@ pub fn try_compile_checksum<I: Iterator<Item = Result<FileInfo, E>>, E>(
 }
 
 pub fn md5_string(s: &str) -> String {
-    tohex(&(Md5::new().chain_update(s).finalize()))
+    hex::encode(&(Md5::new().chain_update(s).finalize()))
 }
 
 pub fn md5_file<P: AsRef<Path>>(path: &P) -> Result<String, io::Error> {
     let mut file = fs::File::open(path)?;
     let mut hasher = Md5::new();
     io::copy(&mut file, &mut hasher)?;
-    Ok(tohex(&hasher.finalize()))
+    Ok(hex::encode(&hasher.finalize()))
 }
 
 #[cfg(test)]
