@@ -1,4 +1,4 @@
-use crate::checksum::{FileInfo, ZarrEntry};
+use crate::checksum::{try_compile_checksum, FileInfo};
 use std::collections::VecDeque;
 use std::fs;
 use std::io;
@@ -6,13 +6,11 @@ use std::path::{Path, PathBuf};
 
 // TODO: Return a Result
 pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> String {
-    let zarr: Result<ZarrEntry, _> = DepthFirstIterator::new(dirpath.as_ref())
-        .map(|r| r.map(|p| FileInfo::for_file(p, dirpath.as_ref().into())))
-        .collect();
-    match zarr {
-        Ok(z) => z.digest().digest,
-        Err(e) => panic!("Error walking Zarr: {e}"),
-    }
+    try_compile_checksum(
+        DepthFirstIterator::new(dirpath.as_ref())
+            .map(|r| r.map(|p| FileInfo::for_file(p, dirpath.as_ref().into()))),
+    )
+    .expect("Error walking Zarr")
 }
 
 struct DepthFirstIterator {

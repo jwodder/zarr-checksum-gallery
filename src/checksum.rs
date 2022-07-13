@@ -203,6 +203,16 @@ pub fn get_checksum(
     }
 }
 
+pub fn compile_checksum<I: Iterator<Item = FileInfo>>(iter: I) -> String {
+    iter.collect::<ZarrEntry>().digest().digest
+}
+
+pub fn try_compile_checksum<I: Iterator<Item = Result<FileInfo, E>>, E>(
+    iter: I,
+) -> Result<String, E> {
+    Ok(iter.collect::<Result<ZarrEntry, E>>()?.digest().digest)
+}
+
 pub fn md5_string(s: &str) -> String {
     tohex(&(Md5::new().chain_update(s).finalize()))
 }
