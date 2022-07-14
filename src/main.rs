@@ -1,5 +1,5 @@
 use clap::Parser;
-use dandi_zarr_checksum::Walker;
+use dandi_zarr_checksum::{Walker, ZarrError};
 use std::path::PathBuf;
 
 #[derive(Clone, Debug, Eq, Parser, PartialEq)]
@@ -10,7 +10,8 @@ struct Arguments {
     dirpath: PathBuf,
 }
 
-fn main() {
+fn main() -> Result<(), ZarrError> {
     let args = Arguments::parse();
-    println!("{}", args.walker.run(args.dirpath));
+    println!("{}", args.walker.run(args.dirpath)?);
+    Ok(())
 }

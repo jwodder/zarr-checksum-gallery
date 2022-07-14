@@ -1,9 +1,9 @@
 use crate::checksum::{try_compile_checksum, FileInfo};
+use crate::error::ZarrError;
 use std::path::Path;
 use walkdir::WalkDir;
 
-// TODO: Return a Result
-pub fn walkdir_checksum<P: AsRef<Path>>(dirpath: P) -> String {
+pub fn walkdir_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrError> {
     try_compile_checksum(
         WalkDir::new(dirpath.as_ref())
             .into_iter()
@@ -15,7 +15,11 @@ pub fn walkdir_checksum<P: AsRef<Path>>(dirpath: P) -> String {
                 Ok(e) => e.file_type().is_file(),
                 Err(_) => true,
             })
-            .map(|r| r.map(|e| FileInfo::for_file(e.path(), dirpath.as_ref()).unwrap())),
+            .map(|r| {
+                r.map_or_else(
+                    |exc| Err(ZarrError::walkdir_error(exc)),
+                    |e| FileInfo::for_file(e.path(), dirpath.as_ref()),
+                )
+            }),
     )
-    .expect("Error walking Zarr")
 }

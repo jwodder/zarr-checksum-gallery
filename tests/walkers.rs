@@ -13,15 +13,18 @@ fn sample_path() -> PathBuf {
 
 #[test]
 fn test_walkdir_checksum() {
-    assert_eq!(walkdir_checksum(sample_path()), SAMPLE_CHECKSUM);
+    assert_eq!(walkdir_checksum(sample_path()).unwrap(), SAMPLE_CHECKSUM);
 }
 
 #[test]
 fn test_recursive_checksum() {
-    assert_eq!(recursive_checksum(sample_path()), SAMPLE_CHECKSUM);
+    assert_eq!(recursive_checksum(sample_path()).unwrap(), SAMPLE_CHECKSUM);
 }
 
 #[test]
 fn test_depth_first_checksum() {
-    assert_eq!(depth_first_checksum(sample_path()), SAMPLE_CHECKSUM);
+    assert_eq!(
+        depth_first_checksum(sample_path()).unwrap(),
+        SAMPLE_CHECKSUM
+    );
 }

@@ -1,6 +1,7 @@
 use std::io;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
+use walkdir::Error as WDError;
 
 #[derive(Debug, Error)]
 pub enum ZarrError {
@@ -12,6 +13,15 @@ pub enum ZarrError {
 
     #[error("Error stat'ing file: {}: {source:?}", .path.display())]
     StatError { path: PathBuf, source: io::Error },
+
+    #[error("Error reading directory: {}: {source:?}", .path.display())]
+    ReaddirError { path: PathBuf, source: io::Error },
+
+    #[error("Error walking directory: {source}")]
+    WalkdirError {
+        #[from]
+        source: WDError,
+    },
 }
 
 impl ZarrError {
@@ -34,5 +44,16 @@ impl ZarrError {
             path: path.as_ref().into(),
             source,
         }
+    }
+
+    pub fn readdir_error<P: AsRef<Path>>(path: P, source: io::Error) -> Self {
+        ZarrError::ReaddirError {
+            path: path.as_ref().into(),
+            source,
+        }
+    }
+
+    pub fn walkdir_error(e: WDError) -> Self {
+        e.into()
     }
 }

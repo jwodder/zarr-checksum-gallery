@@ -1,20 +1,18 @@
 use crate::checksum::{try_compile_checksum, FileInfo};
+use crate::error::ZarrError;
 use std::collections::VecDeque;
 use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
 
-// TODO: Return a Result
-pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> String {
+pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrError> {
     try_compile_checksum(
         DepthFirstIterator::new(dirpath.as_ref())
-            .map(|r| r.map(|p| FileInfo::for_file(p, dirpath.as_ref().into()).unwrap())),
+            .map(|r| r.and_then(|p| FileInfo::for_file(p, dirpath.as_ref().into()))),
     )
-    .expect("Error walking Zarr")
 }
 
 struct DepthFirstIterator {
-    queue: VecDeque<Result<PathBuf, io::Error>>,
+    queue: VecDeque<Result<PathBuf, ZarrError>>,
 }
 
 impl DepthFirstIterator {
@@ -26,9 +24,9 @@ impl DepthFirstIterator {
 }
 
 impl Iterator for DepthFirstIterator {
-    type Item = Result<PathBuf, io::Error>;
+    type Item = Result<PathBuf, ZarrError>;
 
-    fn next(&mut self) -> Option<Result<PathBuf, io::Error>> {
+    fn next(&mut self) -> Option<Result<PathBuf, ZarrError>> {
         loop {
             let path = self.queue.pop_front()?;
             // TODO: Try to simplify this code
@@ -37,14 +35,19 @@ impl Iterator for DepthFirstIterator {
                     Ok(m) => {
                         if m.is_dir() {
                             match fs::read_dir(&path) {
-                                Ok(iter) => self.queue.extend(iter.map(|r| r.map(|e| e.path()))),
-                                Err(e) => return Some(Err(e)),
+                                Ok(iter) => self.queue.extend(iter.map(|r| {
+                                    r.map_or_else(
+                                        |exc| Err(ZarrError::readdir_error(&path, exc)),
+                                        |e| Ok(e.path()),
+                                    )
+                                })),
+                                Err(e) => return Some(Err(ZarrError::readdir_error(&path, e))),
                             }
                         } else {
                             return Some(Ok(path));
                         }
                     }
-                    Err(e) => return Some(Err(e)),
+                    Err(e) => return Some(Err(ZarrError::stat_error(&path, e))),
                 },
                 Err(e) => return Some(Err(e)),
             }
