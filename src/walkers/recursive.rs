@@ -1,31 +1,28 @@
+use super::listdir::listdir;
 use crate::checksum::{get_checksum, FileInfo, ZarrDigest};
 use crate::error::ZarrError;
 use std::collections::HashMap;
-use std::fs;
 use std::path::Path;
 
 pub fn recursive_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrError> {
     fn recurse(path: &Path, basepath: &Path) -> Result<ZarrDigest, ZarrError> {
-        let mut files = HashMap::new();
-        let mut directories = HashMap::new();
-        for p in fs::read_dir(&path).map_err(|e| ZarrError::readdir_error(&path, e))? {
-            let p = p.map_err(|e| ZarrError::readdir_error(&path, e))?;
-            let name = p.file_name().to_str().unwrap().to_string();
-            if p.file_type()
-                .map_err(|e| ZarrError::stat_error(&p.path(), e))?
-                .is_dir()
-            {
-                let dgst = recurse(&p.path(), basepath)?;
-                if dgst.file_count != 0 {
-                    directories.insert(name, dgst);
-                }
-            } else {
-                files.insert(
-                    name,
-                    FileInfo::for_file(p.path(), basepath.into())?.to_zarr_digest(),
-                );
-            }
-        }
+        let entries = listdir(path)?;
+        let (files, directories): (Vec<_>, Vec<_>) = entries.into_iter().partition(|e| !e.is_dir());
+        let files = files
+            .into_iter()
+            .map(|e| {
+                FileInfo::for_file(e.path(), basepath.into())
+                    .map(|info| (e.name(), info.to_zarr_digest()))
+            })
+            .collect::<Result<HashMap<String, ZarrDigest>, ZarrError>>()?;
+        let directories = directories
+            .into_iter()
+            .map(|e| recurse(&e.path(), basepath).map(|dgst| (e.name(), dgst)))
+            .filter(|r| match r {
+                Ok((_, dgst)) => dgst.file_count != 0,
+                Err(_) => true,
+            })
+            .collect::<Result<HashMap<String, ZarrDigest>, ZarrError>>()?;
         Ok(get_checksum(files, directories))
     }
 
