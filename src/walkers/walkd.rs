@@ -15,7 +15,7 @@ pub fn walkdir_checksum<P: AsRef<Path>>(dirpath: P) -> String {
                 Ok(e) => e.file_type().is_file(),
                 Err(_) => true,
             })
-            .map(|r| r.map(|e| FileInfo::for_file(e.path(), dirpath.as_ref()))),
+            .map(|r| r.map(|e| FileInfo::for_file(e.path(), dirpath.as_ref()).unwrap())),
     )
     .expect("Error walking Zarr")
 }

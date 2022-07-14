@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> String {
     try_compile_checksum(
         DepthFirstIterator::new(dirpath.as_ref())
-            .map(|r| r.map(|p| FileInfo::for_file(p, dirpath.as_ref().into()))),
+            .map(|r| r.map(|p| FileInfo::for_file(p, dirpath.as_ref().into()).unwrap())),
     )
     .expect("Error walking Zarr")
 }

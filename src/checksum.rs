@@ -1,4 +1,5 @@
 use crate::checksum_json::get_checksum_json;
+use crate::error::ZarrError;
 use md5::{Digest, Md5};
 use std::collections::HashMap;
 use std::fmt;
@@ -148,30 +149,19 @@ pub struct FileInfo {
 }
 
 impl FileInfo {
-    // TODO: Make this return a Result (and use Result::and_then() to call it
-    // in the walker)
-    pub fn for_file<P: AsRef<Path>>(path: P, basepath: P) -> FileInfo {
-        let relpath = match path.as_ref().strip_prefix(PathBuf::from(basepath.as_ref())) {
-            Ok(p) => p,
-            Err(_) => panic!(
-                "Path {:?} is not a descendant of {:?}",
-                path.as_ref(),
-                basepath.as_ref()
-            ),
-        };
-        let size = match fs::metadata(path.as_ref()) {
-            Ok(m) => m.len(),
-            Err(e) => panic!("Could not get size of {:?}: {e}", path.as_ref()),
-        };
-        let digest = match md5_file(&path) {
-            Ok(d) => d,
-            Err(e) => panic!("Failed to digest {:?}: {e}", path.as_ref()),
-        };
-        FileInfo {
+    pub fn for_file<P: AsRef<Path>>(path: P, basepath: P) -> Result<FileInfo, ZarrError> {
+        let path = path.as_ref();
+        let basepath = basepath.as_ref();
+        let relpath = path
+            .strip_prefix(PathBuf::from(basepath))
+            .map_err(|_| ZarrError::strip_prefix_error(&path, &basepath))?;
+        Ok(FileInfo {
             path: relpath.into(),
-            digest,
-            size,
-        }
+            digest: md5_file(&path)?,
+            size: fs::metadata(&path)
+                .map_err(|e| ZarrError::stat_error(&path, e))?
+                .len(),
+        })
     }
 
     pub fn to_zarr_digest(&self) -> ZarrDigest {
@@ -216,10 +206,10 @@ pub fn md5_string(s: &str) -> String {
     hex::encode(&(Md5::new().chain_update(s).finalize()))
 }
 
-pub fn md5_file<P: AsRef<Path>>(path: P) -> Result<String, io::Error> {
-    let mut file = fs::File::open(path)?;
+pub fn md5_file<P: AsRef<Path>>(path: P) -> Result<String, ZarrError> {
+    let mut file = fs::File::open(&path).map_err(|e| ZarrError::md5_file_error(&path, e))?;
     let mut hasher = Md5::new();
-    io::copy(&mut file, &mut hasher)?;
+    io::copy(&mut file, &mut hasher).map_err(|e| ZarrError::md5_file_error(&path, e))?;
     Ok(hex::encode(&hasher.finalize()))
 }
 

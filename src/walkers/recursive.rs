@@ -17,7 +17,9 @@ pub fn recursive_checksum<P: AsRef<Path>>(dirpath: P) -> String {
             } else {
                 files.insert(
                     name,
-                    FileInfo::for_file(p.path(), basepath.as_ref().into()).to_zarr_digest(),
+                    FileInfo::for_file(p.path(), basepath.as_ref().into())
+                        .unwrap()
+                        .to_zarr_digest(),
                 );
             }
         }
