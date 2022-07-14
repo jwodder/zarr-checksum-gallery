@@ -15,7 +15,10 @@ pub fn recursive_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrErro
                 .map_err(|e| ZarrError::stat_error(&p.path(), e))?
                 .is_dir()
             {
-                directories.insert(name, recurse(&p.path(), basepath)?);
+                let dgst = recurse(&p.path(), basepath)?;
+                if dgst.file_count != 0 {
+                    directories.insert(name, dgst);
+                }
             } else {
                 files.insert(
                     name,
