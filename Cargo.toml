@@ -11,4 +11,6 @@ thiserror = "1.0.31"
 walkdir = "2.3.2"
 
 [dev-dependencies]
+fs_extra = "1.2.0"
 rstest = "0.15.0"
+tempfile = "3.3.0"
