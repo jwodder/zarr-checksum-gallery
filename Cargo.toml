@@ -6,7 +6,9 @@ edition = "2021"
 [dependencies]
 clap = { version = "3.2.8", default-features = false, features = ["derive", "std", "suggestions", "wrap_help"] }
 hex = "0.4.3"
+log = "0.4.17"
 md-5 = "0.10.1"
+stderrlog = "0.5.3"
 thiserror = "1.0.31"
 walkdir = "2.3.2"
 

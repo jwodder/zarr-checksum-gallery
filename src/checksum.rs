@@ -142,6 +142,7 @@ impl FromIterator<FileInfo> for ZarrEntry {
     }
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct FileInfo {
     pub path: PathBuf,
     pub digest: String,
