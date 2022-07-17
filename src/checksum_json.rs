@@ -1,30 +1,30 @@
-use crate::checksum::ZarrDigest;
+use crate::checksum::ZarrChecksum;
 use std::collections::HashMap;
 use std::fmt::{Error, Write};
 
 pub fn get_checksum_json(
-    files: &HashMap<String, ZarrDigest>,
-    directories: &HashMap<String, ZarrDigest>,
+    files: &HashMap<String, ZarrChecksum>,
+    directories: &HashMap<String, ZarrChecksum>,
 ) -> String {
     let mut filevec = Vec::new();
-    for (name, digest) in files.iter() {
-        filevec.push(ZarrChecksum {
+    for (name, checksum) in files.iter() {
+        filevec.push(ZarrJSONChecksum {
             name: name.clone(),
-            digest: digest.digest.clone(),
-            size: digest.size,
+            digest: checksum.checksum.clone(),
+            size: checksum.size,
         });
     }
     filevec.sort();
     let mut dirvec = Vec::new();
-    for (name, digest) in directories.iter() {
-        dirvec.push(ZarrChecksum {
+    for (name, checksum) in directories.iter() {
+        dirvec.push(ZarrJSONChecksum {
             name: name.clone(),
-            digest: digest.digest.clone(),
-            size: digest.size,
+            digest: checksum.checksum.clone(),
+            size: checksum.size,
         });
     }
     dirvec.sort();
-    let collection = ZarrChecksumCollection {
+    let collection = ZarrJSONChecksumCollection {
         directories: dirvec,
         files: filevec,
     };
@@ -34,13 +34,13 @@ pub fn get_checksum_json(
 }
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-struct ZarrChecksum {
+struct ZarrJSONChecksum {
     name: String,
     digest: String,
     size: u64,
 }
 
-impl ZarrChecksum {
+impl ZarrJSONChecksum {
     fn write_json<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_str(r#"{"digest":"#)?;
         write_json_str(&self.digest, writer)?;
@@ -52,12 +52,12 @@ impl ZarrChecksum {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-struct ZarrChecksumCollection {
-    directories: Vec<ZarrChecksum>,
-    files: Vec<ZarrChecksum>,
+struct ZarrJSONChecksumCollection {
+    directories: Vec<ZarrJSONChecksum>,
+    files: Vec<ZarrJSONChecksum>,
 }
 
-impl ZarrChecksumCollection {
+impl ZarrJSONChecksumCollection {
     fn write_json<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_str(r#"{"directories":["#)?;
         for (i, d) in self.directories.iter().enumerate() {
@@ -127,16 +127,16 @@ mod test {
         let files = HashMap::from([
             (
                 "foo".into(),
-                ZarrDigest {
-                    digest: "0123456789abcdef0123456789abcdef".into(),
+                ZarrChecksum {
+                    checksum: "0123456789abcdef0123456789abcdef".into(),
                     size: 69105,
                     file_count: 1,
                 },
             ),
             (
                 "bar".into(),
-                ZarrDigest {
-                    digest: "abcdef0123456789abcdef0123456789".into(),
+                ZarrChecksum {
+                    checksum: "abcdef0123456789abcdef0123456789".into(),
                     size: 42,
                     file_count: 1,
                 },
@@ -144,8 +144,8 @@ mod test {
         ]);
         let directories = HashMap::from([(
             "quux".into(),
-            ZarrDigest {
-                digest: "0987654321fedcba0987654321fedcba".into(),
+            ZarrChecksum {
+                checksum: "0987654321fedcba0987654321fedcba".into(),
                 size: 65537,
                 file_count: 23,
             },

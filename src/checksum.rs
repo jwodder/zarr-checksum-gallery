@@ -9,22 +9,22 @@ use std::iter::Iterator;
 use std::path::{Component, Path, PathBuf};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct ZarrDigest {
-    pub digest: String,
+pub struct ZarrChecksum {
+    pub checksum: String,
     pub size: u64,
     pub file_count: usize,
 }
 
-impl fmt::Display for ZarrDigest {
+impl fmt::Display for ZarrChecksum {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.digest)
+        write!(f, "{}", self.checksum)
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ZarrEntry {
     File {
-        digest: ZarrDigest,
+        checksum: ZarrChecksum,
     },
     Directory {
         children: HashMap<String, ZarrEntry>,
@@ -36,8 +36,8 @@ impl ZarrEntry {
         ZarrEntry::directory()
     }
 
-    pub fn file(digest: ZarrDigest) -> Self {
-        ZarrEntry::File { digest }
+    pub fn file(checksum: ZarrChecksum) -> Self {
+        ZarrEntry::File { checksum }
     }
 
     pub fn directory() -> Self {
@@ -46,20 +46,20 @@ impl ZarrEntry {
         }
     }
 
-    pub fn digest(&self) -> ZarrDigest {
+    pub fn checksum(&self) -> ZarrChecksum {
         match self {
-            ZarrEntry::File { digest, .. } => digest.clone(),
+            ZarrEntry::File { checksum, .. } => checksum.clone(),
             ZarrEntry::Directory { children, .. } => {
                 let (files, directories): (Vec<_>, Vec<_>) =
                     children.iter().partition(|(_, v)| v.is_file());
                 get_checksum(
                     files
                         .into_iter()
-                        .map(|(k, v)| (k.clone(), v.digest()))
+                        .map(|(k, v)| (k.clone(), v.checksum()))
                         .collect(),
                     directories
                         .into_iter()
-                        .map(|(k, v)| (k.clone(), v.digest()))
+                        .map(|(k, v)| (k.clone(), v.checksum()))
                         .collect(),
                 )
             }
@@ -74,7 +74,7 @@ impl ZarrEntry {
     }
 
     // Should this return a Result?
-    pub fn add_path<P: AsRef<Path>>(&mut self, path: P, digest: &str, size: u64) {
+    pub fn add_path<P: AsRef<Path>>(&mut self, path: P, checksum: &str, size: u64) {
         match self {
             ZarrEntry::File { .. } => panic!("Cannot add a path to a file"),
             ZarrEntry::Directory { children, .. } => {
@@ -109,8 +109,8 @@ impl ZarrEntry {
                         ZarrEntry::Directory { children, .. } => d = children,
                     }
                 }
-                let entry = ZarrEntry::file(ZarrDigest {
-                    digest: digest.to_string(),
+                let entry = ZarrEntry::file(ZarrChecksum {
+                    checksum: checksum.to_string(),
                     size,
                     file_count: 1,
                 });
@@ -122,7 +122,7 @@ impl ZarrEntry {
     }
 
     pub fn add_file_info(&mut self, info: FileInfo) {
-        self.add_path(info.path, &info.digest, info.size);
+        self.add_path(info.path, &info.md5_digest, info.size);
     }
 }
 
@@ -145,7 +145,7 @@ impl FromIterator<FileInfo> for ZarrEntry {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct FileInfo {
     pub path: PathBuf,
-    pub digest: String,
+    pub md5_digest: String,
     pub size: u64,
 }
 
@@ -158,16 +158,16 @@ impl FileInfo {
             .map_err(|_| ZarrError::strip_prefix_error(&path, &basepath))?;
         Ok(FileInfo {
             path: relpath.into(),
-            digest: md5_file(&path)?,
+            md5_digest: md5_file(&path)?,
             size: fs::metadata(&path)
                 .map_err(|e| ZarrError::stat_error(&path, e))?
                 .len(),
         })
     }
 
-    pub fn to_zarr_digest(&self) -> ZarrDigest {
-        ZarrDigest {
-            digest: self.digest.clone(),
+    pub fn to_zarr_checksum(&self) -> ZarrChecksum {
+        ZarrChecksum {
+            checksum: self.md5_digest.clone(),
             size: self.size,
             file_count: 1,
         }
@@ -175,9 +175,9 @@ impl FileInfo {
 }
 
 pub fn get_checksum(
-    files: HashMap<String, ZarrDigest>,
-    directories: HashMap<String, ZarrDigest>,
-) -> ZarrDigest {
+    files: HashMap<String, ZarrChecksum>,
+    directories: HashMap<String, ZarrChecksum>,
+) -> ZarrChecksum {
     let md5 = md5_string(&get_checksum_json(&files, &directories));
     let mut size = 0;
     let mut file_count = 0;
@@ -185,22 +185,22 @@ pub fn get_checksum(
         size += zd.size;
         file_count += zd.file_count;
     }
-    let digest = format!("{md5}-{file_count}--{size}");
-    ZarrDigest {
-        digest,
+    let checksum = format!("{md5}-{file_count}--{size}");
+    ZarrChecksum {
+        checksum,
         size,
         file_count,
     }
 }
 
 pub fn compile_checksum<I: Iterator<Item = FileInfo>>(iter: I) -> String {
-    iter.collect::<ZarrEntry>().digest().digest
+    iter.collect::<ZarrEntry>().checksum().checksum
 }
 
 pub fn try_compile_checksum<I: Iterator<Item = Result<FileInfo, E>>, E>(
     iter: I,
 ) -> Result<String, E> {
-    Ok(iter.collect::<Result<ZarrEntry, E>>()?.digest().digest)
+    Ok(iter.collect::<Result<ZarrEntry, E>>()?.checksum().checksum)
 }
 
 pub fn md5_string(s: &str) -> String {
@@ -222,23 +222,23 @@ mod test {
     fn test_get_checksum_nothing() {
         let files = HashMap::new();
         let directories = HashMap::new();
-        let digest = get_checksum(files, directories);
-        assert_eq!(digest.digest, "481a2f77ab786a0f45aafd5db0971caa-0--0");
+        let checksum = get_checksum(files, directories);
+        assert_eq!(checksum.checksum, "481a2f77ab786a0f45aafd5db0971caa-0--0");
     }
 
     #[test]
     fn test_get_checksum_one_file() {
         let files = HashMap::from([(
             "bar".into(),
-            ZarrDigest {
-                digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+            ZarrChecksum {
+                checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
                 size: 1,
                 file_count: 1,
             },
         )]);
         let directories = HashMap::new();
-        let digest = get_checksum(files, directories);
-        assert_eq!(digest.digest, "f21b9b4bf53d7ce1167bcfae76371e59-1--1");
+        let checksum = get_checksum(files, directories);
+        assert_eq!(checksum.checksum, "f21b9b4bf53d7ce1167bcfae76371e59-1--1");
     }
 
     #[test]
@@ -246,14 +246,14 @@ mod test {
         let files = HashMap::new();
         let directories = HashMap::from([(
             "bar".into(),
-            ZarrDigest {
-                digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-1--1".into(),
+            ZarrChecksum {
+                checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-1--1".into(),
                 size: 1,
                 file_count: 1,
             },
         )]);
-        let digest = get_checksum(files, directories);
-        assert_eq!(digest.digest, "ea8b8290b69b96422a3ed1cca0390f21-1--1");
+        let checksum = get_checksum(files, directories);
+        assert_eq!(checksum.checksum, "ea8b8290b69b96422a3ed1cca0390f21-1--1");
     }
 
     #[test]
@@ -261,24 +261,24 @@ mod test {
         let files = HashMap::from([
             (
                 "bar".into(),
-                ZarrDigest {
-                    digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+                ZarrChecksum {
+                    checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
                     size: 1,
                     file_count: 1,
                 },
             ),
             (
                 "baz".into(),
-                ZarrDigest {
-                    digest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
+                ZarrChecksum {
+                    checksum: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
                     size: 1,
                     file_count: 1,
                 },
             ),
         ]);
         let directories = HashMap::new();
-        let digest = get_checksum(files, directories);
-        assert_eq!(digest.digest, "8e50add2b46d3a6389e2d9d0924227fb-2--2");
+        let checksum = get_checksum(files, directories);
+        assert_eq!(checksum.checksum, "8e50add2b46d3a6389e2d9d0924227fb-2--2");
     }
 
     #[test]
@@ -287,49 +287,49 @@ mod test {
         let directories = HashMap::from([
             (
                 "bar".into(),
-                ZarrDigest {
-                    digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-1--1".into(),
+                ZarrChecksum {
+                    checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-1--1".into(),
                     size: 1,
                     file_count: 1,
                 },
             ),
             (
                 "baz".into(),
-                ZarrDigest {
-                    digest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-1--1".into(),
+                ZarrChecksum {
+                    checksum: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-1--1".into(),
                     size: 1,
                     file_count: 1,
                 },
             ),
         ]);
-        let digest = get_checksum(files, directories);
-        assert_eq!(digest.digest, "4c21a113688f925240549b14136d61ff-2--2");
+        let checksum = get_checksum(files, directories);
+        assert_eq!(checksum.checksum, "4c21a113688f925240549b14136d61ff-2--2");
     }
 
     #[test]
     fn test_get_checksum_one_of_each() {
         let files = HashMap::from([(
             "baz".into(),
-            ZarrDigest {
-                digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+            ZarrChecksum {
+                checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
                 size: 1,
                 file_count: 1,
             },
         )]);
         let directories = HashMap::from([(
             "bar".into(),
-            ZarrDigest {
-                digest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-1--1".into(),
+            ZarrChecksum {
+                checksum: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-1--1".into(),
                 size: 1,
                 file_count: 1,
             },
         )]);
-        let digest = get_checksum(files, directories);
-        assert_eq!(digest.digest, "d5e4eb5dc8efdb54ff089db1eef34119-2--2");
+        let checksum = get_checksum(files, directories);
+        assert_eq!(checksum.checksum, "d5e4eb5dc8efdb54ff089db1eef34119-2--2");
     }
 
     #[test]
-    fn test_tree_digest() {
+    fn test_tree_checksum() {
         let mut sample = ZarrEntry::directory();
         sample.add_path("arr_0/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315);
         sample.add_path("arr_0/0", "ed4e934a474f1d2096846c6248f18c00", 431);
@@ -337,7 +337,7 @@ mod test {
         sample.add_path("arr_1/0", "fba4dee03a51bde314e9713b00284a93", 431);
         sample.add_path(".zgroup", "e20297935e73dd0154104d4ea53040ab", 24);
         assert_eq!(
-            sample.digest().digest,
+            sample.checksum().checksum,
             "4313ab36412db2981c3ed391b38604d6-5--1516"
         );
     }
@@ -347,33 +347,33 @@ mod test {
         let files = vec![
             FileInfo {
                 path: "arr_0/.zarray".into(),
-                digest: "9e30a0a1a465e24220d4132fdd544634".into(),
+                md5_digest: "9e30a0a1a465e24220d4132fdd544634".into(),
                 size: 315,
             },
             FileInfo {
                 path: "arr_0/0".into(),
-                digest: "ed4e934a474f1d2096846c6248f18c00".into(),
+                md5_digest: "ed4e934a474f1d2096846c6248f18c00".into(),
                 size: 431,
             },
             FileInfo {
                 path: "arr_1/.zarray".into(),
-                digest: "9e30a0a1a465e24220d4132fdd544634".into(),
+                md5_digest: "9e30a0a1a465e24220d4132fdd544634".into(),
                 size: 315,
             },
             FileInfo {
                 path: "arr_1/0".into(),
-                digest: "fba4dee03a51bde314e9713b00284a93".into(),
+                md5_digest: "fba4dee03a51bde314e9713b00284a93".into(),
                 size: 431,
             },
             FileInfo {
                 path: ".zgroup".into(),
-                digest: "e20297935e73dd0154104d4ea53040ab".into(),
+                md5_digest: "e20297935e73dd0154104d4ea53040ab".into(),
                 size: 24,
             },
         ];
         let sample = ZarrEntry::from_iter(files);
         assert_eq!(
-            sample.digest().digest,
+            sample.checksum().checksum,
             "4313ab36412db2981c3ed391b38604d6-5--1516"
         );
     }
