@@ -5,16 +5,16 @@ use walkdir::Error as WDError;
 
 #[derive(Debug, Error)]
 pub enum ZarrError {
-    #[error("Error digesting file: {}: {source:?}", .path.display())]
+    #[error("Error digesting file: {}: {source}", .path.display())]
     MD5FileError { path: PathBuf, source: io::Error },
 
     #[error("Path {path:?} is not a descendant of {basepath:?}")]
     StripPrefixError { path: PathBuf, basepath: PathBuf },
 
-    #[error("Error stat'ing file: {}: {source:?}", .path.display())]
+    #[error("Error stat'ing file: {}: {source}", .path.display())]
     StatError { path: PathBuf, source: io::Error },
 
-    #[error("Error reading directory: {}: {source:?}", .path.display())]
+    #[error("Error reading directory: {}: {source}", .path.display())]
     ReaddirError { path: PathBuf, source: io::Error },
 
     #[error("Error walking directory: {source}")]
