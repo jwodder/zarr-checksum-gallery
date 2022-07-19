@@ -2,9 +2,7 @@ use clap::{Parser, Subcommand};
 use dandi_zarr_checksum::{
     depth_first_checksum, fastio_checksum, recursive_checksum, walkdir_checksum, ZarrError,
 };
-use log::Level;
 use std::path::PathBuf;
-use stderrlog::ColorChoice;
 
 #[derive(Clone, Debug, Eq, Parser, PartialEq)]
 #[clap(version)]
@@ -37,11 +35,13 @@ enum Command {
 fn main() -> Result<(), ZarrError> {
     let args = Arguments::parse();
     if args.debug {
-        stderrlog::new()
-            .verbosity(Level::Debug)
-            // The threading causes the colors to be applied to stdout as well
-            .color(ColorChoice::Never)
-            .init()
+        fern::Dispatch::new()
+            .format(|out, message, record| {
+                out.finish(format_args!("[{:<5}] {}", record.level(), message))
+            })
+            .level(log::LevelFilter::Debug)
+            .chain(std::io::stderr())
+            .apply()
             .unwrap();
     }
     let checksum = match args.command {
