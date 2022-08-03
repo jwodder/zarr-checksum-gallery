@@ -75,20 +75,18 @@ impl ZarrEntry {
 
     // Should this return a Result?
     pub fn add_path<P: AsRef<Path>>(&mut self, path: P, checksum: &str, size: u64) {
+        let path = path.as_ref();
         match self {
             ZarrEntry::File { .. } => panic!("Cannot add a path to a file"),
             ZarrEntry::Directory { children, .. } => {
                 let mut parts = Vec::new();
-                for p in path.as_ref().components() {
+                for p in path.components() {
                     match p {
                         Component::Normal(s) => match s.to_str() {
                             Some(name) => parts.push(name.to_string()),
-                            None => panic!("Non-UTF-8 path: {:?}", path.as_ref()),
+                            None => panic!("Non-UTF-8 path: {:?}", path),
                         },
-                        _ => panic!(
-                            "Non-normalized or absolute path: {}",
-                            path.as_ref().display()
-                        ),
+                        _ => panic!("Non-normalized or absolute path: {}", path.display()),
                     }
                 }
                 let basename = match parts.pop() {
@@ -115,7 +113,7 @@ impl ZarrEntry {
                     file_count: 1,
                 });
                 if d.insert(basename, entry).is_some() {
-                    panic!("File {} encountered twice", path.as_ref().display());
+                    panic!("File {} encountered twice", path.display());
                 }
             }
         }
