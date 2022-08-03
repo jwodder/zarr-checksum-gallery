@@ -1,6 +1,4 @@
-use dandi_zarr_checksum::{
-    depth_first_checksum, fastio_checksum, recursive_checksum, walkdir_checksum,
-};
+use dandi_zarr_checksum::*;
 use fs_extra::dir;
 use std::fs::create_dir_all;
 use std::path::PathBuf;
@@ -58,17 +56,17 @@ fn test_recursive_checksum2() {
 }
 
 #[test]
-fn test_depth_first_checksum() {
+fn test_breadth_first_checksum() {
     assert_eq!(
-        depth_first_checksum(sample_path()).unwrap(),
+        breadth_first_checksum(sample_path()).unwrap(),
         SAMPLE_CHECKSUM
     );
 }
 
 #[test]
-fn test_depth_first_checksum2() {
+fn test_breadth_first_checksum2() {
     assert_eq!(
-        depth_first_checksum(sample2().path().join("sample.zarr")).unwrap(),
+        breadth_first_checksum(sample2().path().join("sample.zarr")).unwrap(),
         SAMPLE_CHECKSUM
     );
 }

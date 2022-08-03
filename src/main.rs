@@ -1,7 +1,5 @@
 use clap::{Parser, Subcommand};
-use dandi_zarr_checksum::{
-    depth_first_checksum, fastio_checksum, recursive_checksum, walkdir_checksum, ZarrError,
-};
+use dandi_zarr_checksum::*;
 use std::path::PathBuf;
 
 #[derive(Clone, Debug, Eq, Parser, PartialEq)]
@@ -22,7 +20,7 @@ enum Command {
     Recursive {
         dirpath: PathBuf,
     },
-    DepthFirst {
+    BreadthFirst {
         dirpath: PathBuf,
     },
     Fastio {
@@ -47,7 +45,7 @@ fn main() -> Result<(), ZarrError> {
     let checksum = match args.command {
         Command::Walkdir { dirpath } => walkdir_checksum(dirpath),
         Command::Recursive { dirpath } => recursive_checksum(dirpath),
-        Command::DepthFirst { dirpath } => depth_first_checksum(dirpath),
+        Command::BreadthFirst { dirpath } => breadth_first_checksum(dirpath),
         Command::Fastio { threads, dirpath } => fastio_checksum(dirpath, threads),
     };
     println!("{}", checksum?);

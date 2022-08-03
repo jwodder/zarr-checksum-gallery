@@ -4,26 +4,26 @@ use std::collections::VecDeque;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrError> {
+pub fn breadth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrError> {
     try_compile_checksum(
-        DepthFirstIterator::new(dirpath.as_ref())
+        BreadthFirstIterator::new(dirpath.as_ref())
             .map(|r| r.and_then(|p| FileInfo::for_file(p, dirpath.as_ref().into()))),
     )
 }
 
-struct DepthFirstIterator {
+struct BreadthFirstIterator {
     queue: VecDeque<Result<PathBuf, ZarrError>>,
 }
 
-impl DepthFirstIterator {
+impl BreadthFirstIterator {
     fn new<P: AsRef<Path>>(dirpath: P) -> Self {
-        DepthFirstIterator {
+        BreadthFirstIterator {
             queue: VecDeque::from([Ok(dirpath.as_ref().into())]),
         }
     }
 }
 
-impl Iterator for DepthFirstIterator {
+impl Iterator for BreadthFirstIterator {
     type Item = Result<PathBuf, ZarrError>;
 
     fn next(&mut self) -> Option<Result<PathBuf, ZarrError>> {
