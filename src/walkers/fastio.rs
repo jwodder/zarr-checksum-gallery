@@ -2,7 +2,7 @@ use super::listdir::listdir;
 use crate::checksum::{try_compile_checksum, FileInfo};
 use crate::error::ZarrError;
 use log::{debug, info, warn};
-use std::iter::from_fn;
+use std::iter::{from_fn, once};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Condvar, Mutex};
@@ -64,12 +64,11 @@ impl<T> JobStack<T> {
 }
 
 pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<String, ZarrError> {
-    let stack = Arc::new(JobStack::new(
-        vec![PathBuf::from(dirpath.as_ref())].into_iter(),
-    ));
+    let dirpath = dirpath.as_ref();
+    let stack = Arc::new(JobStack::new(once(dirpath.to_path_buf())));
     let (sender, receiver) = channel();
     for i in 0..threads {
-        let basepath = dirpath.as_ref().to_path_buf();
+        let basepath = dirpath.to_path_buf();
         let stack = Arc::clone(&stack);
         let sender = sender.clone();
         thread::spawn(move || {
