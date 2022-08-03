@@ -14,5 +14,5 @@ walkdir = "2.3.2"
 
 [dev-dependencies]
 fs_extra = "1.2.0"
-rstest = "0.15.0"
+rstest = { version = "0.15.0", default-features = false }
 tempfile = "3.3.0"
