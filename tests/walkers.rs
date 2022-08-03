@@ -83,3 +83,19 @@ fn test_fastio_checksum2() {
         SAMPLE_CHECKSUM
     );
 }
+
+#[test]
+fn test_depth_first_checksum() {
+    assert_eq!(
+        depth_first_checksum(sample_path()).unwrap(),
+        SAMPLE_CHECKSUM
+    );
+}
+
+#[test]
+fn test_depth_first_checksum2() {
+    assert_eq!(
+        depth_first_checksum(sample2().path().join("sample.zarr")).unwrap(),
+        SAMPLE_CHECKSUM
+    );
+}
