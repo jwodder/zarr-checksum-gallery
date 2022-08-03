@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 struct OpenDir {
     handle: fs::ReadDir,
     path: PathBuf,
+    name: String,
     entries: ZarrDirectory,
 }
 
@@ -16,21 +17,20 @@ impl OpenDir {
         Ok(OpenDir {
             handle,
             path: dirpath.as_ref().into(),
-            entries: ZarrDirectory::new(name),
+            name,
+            entries: ZarrDirectory::new(),
         })
     }
 }
 
 struct ZarrDirectory {
-    name: String,
     files: HashMap<String, ZarrChecksum>,
     directories: HashMap<String, ZarrChecksum>,
 }
 
 impl ZarrDirectory {
-    fn new(name: String) -> ZarrDirectory {
+    fn new() -> ZarrDirectory {
         ZarrDirectory {
-            name,
             files: HashMap::new(),
             directories: HashMap::new(),
         }
@@ -49,9 +49,8 @@ impl ZarrDirectory {
         self.files.insert(name, checksum);
     }
 
-    fn add_directory(&mut self, zdir: ZarrDirectory) {
+    fn add_directory(&mut self, name: String, zdir: ZarrDirectory) {
         if !zdir.is_empty() {
-            let name = zdir.name.clone();
             let checksum = zdir.checksum();
             self.directories.insert(name, checksum);
         }
@@ -82,9 +81,9 @@ pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrEr
             }
             Some(Err(e)) => return Err(ZarrError::readdir_error(&topdir.path, e)),
             None => {
-                let OpenDir { entries, .. } = dirstack.pop().unwrap();
+                let OpenDir { name, entries, .. } = dirstack.pop().unwrap();
                 match dirstack.last_mut() {
-                    Some(od) => od.entries.add_directory(entries),
+                    Some(od) => od.entries.add_directory(name, entries),
                     None => return Ok(entries.checksum().checksum),
                 }
             }
