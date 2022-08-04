@@ -202,14 +202,14 @@ pub fn try_compile_checksum<I: Iterator<Item = Result<FileInfo, E>>, E>(
 }
 
 pub fn md5_string(s: &str) -> String {
-    hex::encode(&(Md5::new().chain_update(s).finalize()))
+    hex::encode(Md5::digest(s))
 }
 
 pub fn md5_file<P: AsRef<Path>>(path: P) -> Result<String, ZarrError> {
     let mut file = fs::File::open(&path).map_err(|e| ZarrError::md5_file_error(&path, e))?;
     let mut hasher = Md5::new();
     io::copy(&mut file, &mut hasher).map_err(|e| ZarrError::md5_file_error(&path, e))?;
-    Ok(hex::encode(&hasher.finalize()))
+    Ok(hex::encode(hasher.finalize()))
 }
 
 #[cfg(test)]
