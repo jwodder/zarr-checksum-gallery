@@ -23,6 +23,9 @@ enum Command {
     BreadthFirst {
         dirpath: PathBuf,
     },
+    DepthFirst {
+        dirpath: PathBuf,
+    },
     Fastio {
         #[clap(short, long, default_value_t = 5)]
         threads: usize,
@@ -46,6 +49,7 @@ fn main() -> Result<(), ZarrError> {
         Command::Walkdir { dirpath } => walkdir_checksum(dirpath),
         Command::Recursive { dirpath } => recursive_checksum(dirpath),
         Command::BreadthFirst { dirpath } => breadth_first_checksum(dirpath),
+        Command::DepthFirst { dirpath } => depth_first_checksum(dirpath),
         Command::Fastio { threads, dirpath } => fastio_checksum(dirpath, threads),
     };
     println!("{}", checksum?);
