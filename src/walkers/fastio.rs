@@ -19,8 +19,8 @@ struct JobStackData<T> {
 }
 
 impl<T> JobStack<T> {
-    fn new<I: Iterator<Item = T>>(iter: I) -> Self {
-        let queue: Vec<T> = iter.collect();
+    fn new<I: IntoIterator<Item = T>>(items: I) -> Self {
+        let queue: Vec<T> = items.into_iter().collect();
         let tasks = queue.len();
         JobStack {
             data: Mutex::new(JobStackData { queue, tasks }),
@@ -96,7 +96,7 @@ pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<Str
         });
     }
     drop(sender);
-    try_compile_checksum(receiver.into_iter())
+    try_compile_checksum(receiver)
 }
 
 fn helper(

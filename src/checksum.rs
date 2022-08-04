@@ -191,14 +191,18 @@ pub fn get_checksum(
     }
 }
 
-pub fn compile_checksum<I: Iterator<Item = FileInfo>>(iter: I) -> String {
-    iter.collect::<ZarrEntry>().checksum().checksum
+pub fn compile_checksum<I: IntoIterator<Item = FileInfo>>(seq: I) -> String {
+    seq.into_iter().collect::<ZarrEntry>().checksum().checksum
 }
 
-pub fn try_compile_checksum<I: Iterator<Item = Result<FileInfo, E>>, E>(
-    iter: I,
+pub fn try_compile_checksum<I: IntoIterator<Item = Result<FileInfo, E>>, E>(
+    seq: I,
 ) -> Result<String, E> {
-    Ok(iter.collect::<Result<ZarrEntry, E>>()?.checksum().checksum)
+    Ok(seq
+        .into_iter()
+        .collect::<Result<ZarrEntry, E>>()?
+        .checksum()
+        .checksum)
 }
 
 pub fn md5_string(s: &str) -> String {
