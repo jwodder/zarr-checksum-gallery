@@ -9,6 +9,7 @@ fern = "0.6.1"
 hex = "0.4.3"
 log = "0.4.17"
 md-5 = "0.10.1"
+num_cpus = "1.13.1"
 thiserror = "1.0.31"
 walkdir = "2.3.2"
 

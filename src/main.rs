@@ -27,7 +27,7 @@ enum Command {
         dirpath: PathBuf,
     },
     Fastio {
-        #[clap(short, long, default_value_t = 5)]
+        #[clap(short, long, default_value_t = num_cpus::get())]
         threads: usize,
         dirpath: PathBuf,
     },
