@@ -74,7 +74,7 @@ impl ChecksumTree {
     }
 
     // TODO: Should this return a Result?  (Error type name: Tree(Build?)Error?)
-    pub fn add_path<P: AsRef<Path>>(&mut self, relpath: P, checksum: &str, size: u64) {
+    pub fn add_file<P: AsRef<Path>>(&mut self, relpath: P, checksum: &str, size: u64) {
         let relpath = relpath.as_ref();
         match self {
             ChecksumTree::File { .. } => panic!("Cannot add a path to a file"),
@@ -84,6 +84,8 @@ impl ChecksumTree {
                     match p {
                         Component::Normal(s) => match s.to_str() {
                             Some(name) => parts.push(name.to_string()),
+                            // TODO: Replace `P` with a relative_path type so
+                            // that this is caught earlier:
                             None => panic!("Non-UTF-8 path: {:?}", relpath),
                         },
                         _ => panic!("Non-normalized or absolute path: {}", relpath.display()),
@@ -120,7 +122,7 @@ impl ChecksumTree {
     }
 
     pub fn add_file_info(&mut self, info: FileInfo) {
-        self.add_path(info.relpath, &info.md5_digest, info.size);
+        self.add_file(info.relpath, &info.md5_digest, info.size);
     }
 }
 
@@ -339,11 +341,11 @@ mod test {
     #[test]
     fn test_checksum_tree() {
         let mut sample = ChecksumTree::directory();
-        sample.add_path("arr_0/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315);
-        sample.add_path("arr_0/0", "ed4e934a474f1d2096846c6248f18c00", 431);
-        sample.add_path("arr_1/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315);
-        sample.add_path("arr_1/0", "fba4dee03a51bde314e9713b00284a93", 431);
-        sample.add_path(".zgroup", "e20297935e73dd0154104d4ea53040ab", 24);
+        sample.add_file("arr_0/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315);
+        sample.add_file("arr_0/0", "ed4e934a474f1d2096846c6248f18c00", 431);
+        sample.add_file("arr_1/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315);
+        sample.add_file("arr_1/0", "fba4dee03a51bde314e9713b00284a93", 431);
+        sample.add_file(".zgroup", "e20297935e73dd0154104d4ea53040ab", 24);
         assert_eq!(
             sample.checksum().checksum,
             "4313ab36412db2981c3ed391b38604d6-5--1516"
