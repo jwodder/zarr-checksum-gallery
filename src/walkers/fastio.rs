@@ -1,10 +1,10 @@
-use super::util::listdir;
+use super::util::{listdir, DirEntry};
 use crate::checksum::{try_compile_checksum, FileInfo};
 use crate::error::ZarrError;
 use log::{trace, warn};
 use std::iter::once;
 use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
@@ -109,8 +109,19 @@ pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<Str
             trace!("[{i}] Starting thread");
             for path in stack.iter() {
                 trace!("[{i}] Popped {} from stack", path.display());
-                let output = match helper(i, &path, &basepath, &stack) {
-                    Ok(infos) => infos.into_iter().map(Ok).collect::<Vec<_>>(),
+                let output = match listdir(&*path) {
+                    Ok(entries) => {
+                        let (dirs, files): (Vec<_>, Vec<_>) =
+                            entries.into_iter().partition(DirEntry::is_dir);
+                        for d in dirs {
+                            trace!("[{i}] Pushing {} onto stack", d.path().display());
+                            stack.push(d.path());
+                        }
+                        files
+                            .into_iter()
+                            .map(|f| FileInfo::for_file(&f.path(), &basepath))
+                            .collect()
+                    }
                     Err(e) => vec![Err(e)],
                 };
                 for v in output {
@@ -129,21 +140,4 @@ pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<Str
     }
     drop(sender);
     try_compile_checksum(receiver)
-}
-
-fn helper(
-    i: usize,
-    p: &PathBuf,
-    basepath: &PathBuf,
-    stack: &JobStack<PathBuf>,
-) -> Result<Vec<FileInfo>, ZarrError> {
-    let (files, dirs): (Vec<_>, Vec<_>) = listdir(p)?.into_iter().partition(|e| !e.is_dir());
-    for d in dirs {
-        trace!("[{i}] Pushing {} onto stack", d.path().display());
-        stack.push(d.path());
-    }
-    files
-        .into_iter()
-        .map(|f| FileInfo::for_file(&f.path(), basepath))
-        .collect()
 }
