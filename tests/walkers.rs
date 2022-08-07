@@ -18,13 +18,15 @@ fn sample_path() -> PathBuf {
 
 fn sample2() -> TempDir {
     let tmp_path = tempdir().unwrap();
-    dir::copy(sample_path(), tmp_path.path(), &dir::CopyOptions::new()).unwrap();
+    let opts = dir::CopyOptions {
+        content_only: true,
+        ..dir::CopyOptions::default()
+    };
+    dir::copy(sample_path(), tmp_path.path(), &opts).unwrap();
     let mut path = PathBuf::from(tmp_path.path());
-    path.push("sample.zarr");
     path.push("arr_2");
     create_dir_all(path).unwrap();
     let mut path = PathBuf::from(tmp_path.path());
-    path.push("sample.zarr");
     path.push("arr_3");
     path.push("foo");
     create_dir_all(path).unwrap();
@@ -42,10 +44,7 @@ fn test_walkdir_checksum() {
 
 #[test]
 fn test_walkdir_checksum2() {
-    assert_eq!(
-        walkdir_checksum(sample2().path().join("sample.zarr")).unwrap(),
-        SAMPLE_CHECKSUM
-    );
+    assert_eq!(walkdir_checksum(sample2().path()).unwrap(), SAMPLE_CHECKSUM);
 }
 
 #[test]
@@ -64,7 +63,7 @@ fn test_recursive_checksum() {
 #[test]
 fn test_recursive_checksum2() {
     assert_eq!(
-        recursive_checksum(sample2().path().join("sample.zarr")).unwrap(),
+        recursive_checksum(sample2().path()).unwrap(),
         SAMPLE_CHECKSUM
     );
 }
@@ -88,7 +87,7 @@ fn test_breadth_first_checksum() {
 #[test]
 fn test_breadth_first_checksum2() {
     assert_eq!(
-        breadth_first_checksum(sample2().path().join("sample.zarr")).unwrap(),
+        breadth_first_checksum(sample2().path()).unwrap(),
         SAMPLE_CHECKSUM
     );
 }
@@ -112,7 +111,7 @@ fn test_fastio_checksum() {
 #[test]
 fn test_fastio_checksum2() {
     assert_eq!(
-        fastio_checksum(sample2().path().join("sample.zarr"), num_cpus::get()).unwrap(),
+        fastio_checksum(sample2().path(), num_cpus::get()).unwrap(),
         SAMPLE_CHECKSUM
     );
 }
@@ -136,7 +135,7 @@ fn test_depth_first_checksum() {
 #[test]
 fn test_depth_first_checksum2() {
     assert_eq!(
-        depth_first_checksum(sample2().path().join("sample.zarr")).unwrap(),
+        depth_first_checksum(sample2().path()).unwrap(),
         SAMPLE_CHECKSUM
     );
 }
