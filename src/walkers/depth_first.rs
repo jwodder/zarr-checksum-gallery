@@ -45,8 +45,7 @@ impl ZarrDirectory {
     }
 
     fn add_file(&mut self, name: String, info: FileInfo) {
-        let checksum = info.to_zarr_checksum();
-        self.files.insert(name, checksum);
+        self.files.insert(name, info.into());
     }
 
     fn add_directory(&mut self, name: String, zdir: ZarrDirectory) {

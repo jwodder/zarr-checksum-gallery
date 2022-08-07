@@ -163,11 +163,13 @@ impl FileInfo {
                 .len(),
         })
     }
+}
 
-    pub fn to_zarr_checksum(&self) -> ZarrChecksum {
+impl From<FileInfo> for ZarrChecksum {
+    fn from(info: FileInfo) -> ZarrChecksum {
         ZarrChecksum {
-            checksum: self.md5_digest.clone(),
-            size: self.size,
+            checksum: info.md5_digest,
+            size: info.size,
             file_count: 1,
         }
     }
