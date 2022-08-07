@@ -74,19 +74,19 @@ impl ChecksumTree {
     }
 
     // TODO: Should this return a Result?  (Error type name: Tree(Build?)Error?)
-    pub fn add_path<P: AsRef<Path>>(&mut self, path: P, checksum: &str, size: u64) {
-        let path = path.as_ref();
+    pub fn add_path<P: AsRef<Path>>(&mut self, relpath: P, checksum: &str, size: u64) {
+        let relpath = relpath.as_ref();
         match self {
             ChecksumTree::File { .. } => panic!("Cannot add a path to a file"),
             ChecksumTree::Directory { children, .. } => {
                 let mut parts = Vec::new();
-                for p in path.components() {
+                for p in relpath.components() {
                     match p {
                         Component::Normal(s) => match s.to_str() {
                             Some(name) => parts.push(name.to_string()),
-                            None => panic!("Non-UTF-8 path: {:?}", path),
+                            None => panic!("Non-UTF-8 path: {:?}", relpath),
                         },
-                        _ => panic!("Non-normalized or absolute path: {}", path.display()),
+                        _ => panic!("Non-normalized or absolute path: {}", relpath.display()),
                     }
                 }
                 let basename = match parts.pop() {
@@ -113,14 +113,14 @@ impl ChecksumTree {
                     file_count: 1,
                 });
                 if d.insert(basename, entry).is_some() {
-                    panic!("File {} encountered twice", path.display());
+                    panic!("File {} encountered twice", relpath.display());
                 }
             }
         }
     }
 
     pub fn add_file_info(&mut self, info: FileInfo) {
-        self.add_path(info.path, &info.md5_digest, info.size);
+        self.add_path(info.relpath, &info.md5_digest, info.size);
     }
 }
 
@@ -142,7 +142,7 @@ impl FromIterator<FileInfo> for ChecksumTree {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct FileInfo {
-    pub path: PathBuf,
+    pub relpath: PathBuf,
     pub md5_digest: String,
     pub size: u64,
 }
@@ -153,9 +153,10 @@ impl FileInfo {
         let basepath = basepath.as_ref();
         let relpath = path
             .strip_prefix(PathBuf::from(basepath))
-            .map_err(|_| ZarrError::strip_prefix_error(&path, &basepath))?;
+            .map_err(|_| ZarrError::strip_prefix_error(&path, &basepath))?
+            .to_path_buf();
         Ok(FileInfo {
-            path: relpath.into(),
+            relpath,
             md5_digest: md5_file(&path)?,
             size: fs::metadata(&path)
                 .map_err(|e| ZarrError::stat_error(&path, e))?
@@ -351,27 +352,27 @@ mod test {
     fn test_from_iter() {
         let files = vec![
             FileInfo {
-                path: "arr_0/.zarray".into(),
+                relpath: "arr_0/.zarray".into(),
                 md5_digest: "9e30a0a1a465e24220d4132fdd544634".into(),
                 size: 315,
             },
             FileInfo {
-                path: "arr_0/0".into(),
+                relpath: "arr_0/0".into(),
                 md5_digest: "ed4e934a474f1d2096846c6248f18c00".into(),
                 size: 431,
             },
             FileInfo {
-                path: "arr_1/.zarray".into(),
+                relpath: "arr_1/.zarray".into(),
                 md5_digest: "9e30a0a1a465e24220d4132fdd544634".into(),
                 size: 315,
             },
             FileInfo {
-                path: "arr_1/0".into(),
+                relpath: "arr_1/0".into(),
                 md5_digest: "fba4dee03a51bde314e9713b00284a93".into(),
                 size: 431,
             },
             FileInfo {
-                path: ".zgroup".into(),
+                relpath: ".zgroup".into(),
                 md5_digest: "e20297935e73dd0154104d4ea53040ab".into(),
                 size: 24,
             },
