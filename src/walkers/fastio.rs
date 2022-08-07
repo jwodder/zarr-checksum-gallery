@@ -112,14 +112,14 @@ pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<Str
                 let output = match listdir(&*path) {
                     Ok(entries) => {
                         let (dirs, files): (Vec<_>, Vec<_>) =
-                            entries.into_iter().partition(DirEntry::is_dir);
-                        for d in dirs {
-                            trace!("[{i}] Pushing {} onto stack", d.path().display());
-                            stack.push(d.path());
+                            entries.into_iter().partition(|e| e.is_dir);
+                        for DirEntry { path: d, .. } in dirs {
+                            trace!("[{i}] Pushing {} onto stack", d.display());
+                            stack.push(d);
                         }
                         files
                             .into_iter()
-                            .map(|f| FileInfo::for_file(&f.path(), &basepath))
+                            .map(|DirEntry { path, .. }| FileInfo::for_file(&path, &basepath))
                             .collect()
                     }
                     Err(e) => vec![Err(e)],

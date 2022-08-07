@@ -4,23 +4,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub(crate) struct DirEntry {
-    path: PathBuf,
-    name: String,
-    is_dir: bool,
-}
-
-impl DirEntry {
-    pub fn path(&self) -> PathBuf {
-        self.path.clone()
-    }
-
-    pub fn name(&self) -> String {
-        self.name.clone()
-    }
-
-    pub fn is_dir(&self) -> bool {
-        self.is_dir
-    }
+    pub(crate) path: PathBuf,
+    pub(crate) name: String,
+    pub(crate) is_dir: bool,
 }
 
 pub(crate) fn listdir<P: AsRef<Path>>(dirpath: P) -> Result<Vec<DirEntry>, ZarrError> {

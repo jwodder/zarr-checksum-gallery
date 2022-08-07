@@ -1,4 +1,4 @@
-use super::util::listdir;
+use super::util::{listdir, DirEntry};
 use crate::checksum::{get_checksum, FileInfo, ZarrChecksum};
 use crate::error::ZarrError;
 use std::collections::HashMap;
@@ -11,17 +11,16 @@ pub fn recursive_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrErro
 
 fn recurse(path: &Path, basepath: &Path) -> Result<ZarrChecksum, ZarrError> {
     let entries = listdir(path)?;
-    let (files, directories): (Vec<_>, Vec<_>) = entries.into_iter().partition(|e| !e.is_dir());
+    let (files, directories): (Vec<_>, Vec<_>) = entries.into_iter().partition(|e| !e.is_dir);
     let files = files
         .into_iter()
-        .map(|e| {
-            FileInfo::for_file(e.path(), basepath.into())
-                .map(|info| (e.name(), ZarrChecksum::from(info)))
+        .map(|DirEntry { path, name, .. }| {
+            FileInfo::for_file(path, basepath.into()).map(|info| (name, ZarrChecksum::from(info)))
         })
         .collect::<Result<HashMap<String, ZarrChecksum>, ZarrError>>()?;
     let directories = directories
         .into_iter()
-        .map(|e| recurse(&e.path(), basepath).map(|dgst| (e.name(), dgst)))
+        .map(|DirEntry { path, name, .. }| recurse(&path, basepath).map(|dgst| (name, dgst)))
         .collect::<Result<HashMap<String, ZarrChecksum>, ZarrError>>()?;
     Ok(get_checksum(files, directories))
 }
