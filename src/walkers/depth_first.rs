@@ -41,19 +41,13 @@ impl ZarrDirectory {
         get_checksum(self.files, self.directories)
     }
 
-    fn is_empty(&self) -> bool {
-        self.files.is_empty() && self.directories.is_empty()
-    }
-
     fn add_file(&mut self, name: String, info: FileInfo) {
         self.files.insert(name, info.into());
     }
 
     fn add_directory(&mut self, name: String, zdir: ZarrDirectory) {
-        if !zdir.is_empty() {
-            let checksum = zdir.checksum();
-            self.directories.insert(name, checksum);
-        }
+        let checksum = zdir.checksum();
+        self.directories.insert(name, checksum);
     }
 }
 
