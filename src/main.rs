@@ -40,7 +40,7 @@ fn main() -> Result<(), ZarrError> {
             .format(|out, message, record| {
                 out.finish(format_args!("[{:<5}] {}", record.level(), message))
             })
-            .level(log::LevelFilter::Debug)
+            .level(log::LevelFilter::Trace)
             .chain(std::io::stderr())
             .apply()
             .unwrap();

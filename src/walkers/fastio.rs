@@ -1,7 +1,7 @@
 use super::util::listdir;
 use crate::checksum::{try_compile_checksum, FileInfo};
 use crate::error::ZarrError;
-use log::{debug, info, warn};
+use log::{trace, warn};
 use std::iter::once;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -33,7 +33,7 @@ impl<T> JobStack<T> {
         let mut data = self.data.lock().unwrap();
         data.queue.push(item);
         data.tasks += 1;
-        debug!("Task count incremented to {}", data.tasks);
+        trace!("Task count incremented to {}", data.tasks);
         self.cond.notify_one();
     }
 
@@ -52,9 +52,9 @@ impl<'a, T> Iterator for JobStackIterator<'a, T> {
     fn next(&mut self) -> Option<Self::Item> {
         let mut data = self.stack.data.lock().unwrap();
         loop {
-            debug!("Looping through JobStackIterator::next");
+            trace!("Looping through JobStackIterator::next");
             if data.tasks == 0 {
-                debug!("[JobStackIterator::next] tasks == 0; returning None");
+                trace!("[JobStackIterator::next] tasks == 0; returning None");
                 return None;
             }
             match data.queue.pop() {
@@ -65,7 +65,7 @@ impl<'a, T> Iterator for JobStackIterator<'a, T> {
                     })
                 }
                 None => {
-                    debug!("[JobStackIterator::next] queue is empty; waiting");
+                    trace!("[JobStackIterator::next] queue is empty; waiting");
                     data = self.stack.cond.wait(data).unwrap();
                 }
             }
@@ -90,7 +90,7 @@ impl<T> Drop for JobStackItem<'_, T> {
     fn drop(&mut self) {
         let mut data = self.stack.data.lock().unwrap();
         data.tasks -= 1;
-        debug!("Task count decremented to {}", data.tasks);
+        trace!("Task count decremented to {}", data.tasks);
         if data.tasks == 0 {
             self.stack.cond.notify_all();
         }
@@ -106,15 +106,15 @@ pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<Str
         let stack = Arc::clone(&stack);
         let sender = sender.clone();
         thread::spawn(move || {
-            info!("[{i}] Starting thread");
+            trace!("[{i}] Starting thread");
             for path in stack.iter() {
-                info!("[{i}] Popped {} from stack", path.display());
+                trace!("[{i}] Popped {} from stack", path.display());
                 let output = match helper(i, &path, &basepath, &stack) {
                     Ok(infos) => infos.into_iter().map(Ok).collect::<Vec<_>>(),
                     Err(e) => vec![Err(e)],
                 };
                 for v in output {
-                    info!("[{i}] Sending {v:?} to output");
+                    trace!("[{i}] Sending {v:?} to output");
                     match sender.send(v) {
                         Ok(_) => (),
                         Err(_) => {
@@ -124,7 +124,7 @@ pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<Str
                     }
                 }
             }
-            info!("[{i}] Ending thread");
+            trace!("[{i}] Ending thread");
         });
     }
     drop(sender);
@@ -139,7 +139,7 @@ fn helper(
 ) -> Result<Vec<FileInfo>, ZarrError> {
     let (files, dirs): (Vec<_>, Vec<_>) = listdir(p)?.into_iter().partition(|e| !e.is_dir());
     for d in dirs {
-        info!("[{i}] Pushing {} onto stack", d.path().display());
+        trace!("[{i}] Pushing {} onto stack", d.path().display());
         stack.push(d.path());
     }
     files
