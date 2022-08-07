@@ -17,11 +17,13 @@ pub fn get_checksum_json(
     filevec.sort();
     let mut dirvec = Vec::new();
     for (name, checksum) in directories {
-        dirvec.push(ZarrJSONChecksum {
-            name,
-            digest: checksum.checksum,
-            size: checksum.size,
-        });
+        if checksum.file_count > 0 {
+            dirvec.push(ZarrJSONChecksum {
+                name,
+                digest: checksum.checksum,
+                size: checksum.size,
+            });
+        }
     }
     dirvec.sort();
     let collection = ZarrJSONChecksumCollection {
@@ -123,7 +125,7 @@ mod test {
     }
 
     #[test]
-    fn test_checksum_json() {
+    fn test_get_checksum_json() {
         let files = HashMap::from([
             (
                 "foo".into(),
@@ -145,7 +147,7 @@ mod test {
         let directories = HashMap::from([(
             "quux".into(),
             ZarrChecksum {
-                checksum: "0987654321fedcba0987654321fedcba".into(),
+                checksum: "0987654321fedcba0987654321fedcba-23--65537".into(),
                 size: 65537,
                 file_count: 23,
             },
@@ -153,7 +155,22 @@ mod test {
         let json = get_checksum_json(files, directories);
         assert_eq!(
             json,
-            r#"{"directories":[{"digest":"0987654321fedcba0987654321fedcba","name":"quux","size":65537}],"files":[{"digest":"abcdef0123456789abcdef0123456789","name":"bar","size":42},{"digest":"0123456789abcdef0123456789abcdef","name":"foo","size":69105}]}"#
+            r#"{"directories":[{"digest":"0987654321fedcba0987654321fedcba-23--65537","name":"quux","size":65537}],"files":[{"digest":"abcdef0123456789abcdef0123456789","name":"bar","size":42},{"digest":"0123456789abcdef0123456789abcdef","name":"foo","size":69105}]}"#
         );
+    }
+
+    #[test]
+    fn test_get_checksum_json_empty_dir() {
+        let files = HashMap::new();
+        let directories = HashMap::from([(
+            "quux".into(),
+            ZarrChecksum {
+                checksum: "481a2f77ab786a0f45aafd5db0971caa-0--0".into(),
+                size: 0,
+                file_count: 0,
+            },
+        )]);
+        let json = get_checksum_json(files, directories);
+        assert_eq!(json, r#"{"directories":[],"files":[]}"#);
     }
 }

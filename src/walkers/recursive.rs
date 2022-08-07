@@ -22,10 +22,6 @@ fn recurse(path: &Path, basepath: &Path) -> Result<ZarrChecksum, ZarrError> {
     let directories = directories
         .into_iter()
         .map(|e| recurse(&e.path(), basepath).map(|dgst| (e.name(), dgst)))
-        .filter(|r| match r {
-            Ok((_, dgst)) => dgst.file_count != 0,
-            Err(_) => true,
-        })
         .collect::<Result<HashMap<String, ZarrChecksum>, ZarrError>>()?;
     Ok(get_checksum(files, directories))
 }
