@@ -3,23 +3,23 @@ use std::collections::HashMap;
 use std::fmt::{Error, Write};
 
 pub fn get_checksum_json(
-    files: &HashMap<String, ZarrChecksum>,
-    directories: &HashMap<String, ZarrChecksum>,
+    files: HashMap<String, ZarrChecksum>,
+    directories: HashMap<String, ZarrChecksum>,
 ) -> String {
     let mut filevec = Vec::new();
-    for (name, checksum) in files.iter() {
+    for (name, checksum) in files {
         filevec.push(ZarrJSONChecksum {
-            name: name.clone(),
-            digest: checksum.checksum.clone(),
+            name,
+            digest: checksum.checksum,
             size: checksum.size,
         });
     }
     filevec.sort();
     let mut dirvec = Vec::new();
-    for (name, checksum) in directories.iter() {
+    for (name, checksum) in directories {
         dirvec.push(ZarrJSONChecksum {
-            name: name.clone(),
-            digest: checksum.checksum.clone(),
+            name,
+            digest: checksum.checksum,
             size: checksum.size,
         });
     }
@@ -150,7 +150,7 @@ mod test {
                 file_count: 23,
             },
         )]);
-        let json = get_checksum_json(&files, &directories);
+        let json = get_checksum_json(files, directories);
         assert_eq!(
             json,
             r#"{"directories":[{"digest":"0987654321fedcba0987654321fedcba","name":"quux","size":65537}],"files":[{"digest":"abcdef0123456789abcdef0123456789","name":"bar","size":42},{"digest":"0123456789abcdef0123456789abcdef","name":"foo","size":69105}]}"#

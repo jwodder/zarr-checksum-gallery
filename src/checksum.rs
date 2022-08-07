@@ -176,13 +176,13 @@ pub fn get_checksum(
     files: HashMap<String, ZarrChecksum>,
     directories: HashMap<String, ZarrChecksum>,
 ) -> ZarrChecksum {
-    let md5 = md5_string(&get_checksum_json(&files, &directories));
     let mut size = 0;
     let mut file_count = 0;
     for zd in files.values().chain(directories.values()) {
         size += zd.size;
         file_count += zd.file_count;
     }
+    let md5 = md5_string(&get_checksum_json(files, directories));
     let checksum = format!("{md5}-{file_count}--{size}");
     ZarrChecksum {
         checksum,
