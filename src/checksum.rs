@@ -22,34 +22,34 @@ impl fmt::Display for ZarrChecksum {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ZarrEntry {
+pub enum ChecksumTree {
     File {
         checksum: ZarrChecksum,
     },
     Directory {
-        children: HashMap<String, ZarrEntry>,
+        children: HashMap<String, ChecksumTree>,
     },
 }
 
-impl ZarrEntry {
+impl ChecksumTree {
     pub fn new() -> Self {
-        ZarrEntry::directory()
+        ChecksumTree::directory()
     }
 
     pub fn file(checksum: ZarrChecksum) -> Self {
-        ZarrEntry::File { checksum }
+        ChecksumTree::File { checksum }
     }
 
     pub fn directory() -> Self {
-        ZarrEntry::Directory {
+        ChecksumTree::Directory {
             children: HashMap::new(),
         }
     }
 
     pub fn checksum(&self) -> ZarrChecksum {
         match self {
-            ZarrEntry::File { checksum, .. } => checksum.clone(),
-            ZarrEntry::Directory { children, .. } => {
+            ChecksumTree::File { checksum, .. } => checksum.clone(),
+            ChecksumTree::Directory { children, .. } => {
                 let (files, directories): (Vec<_>, Vec<_>) =
                     children.iter().partition(|(_, v)| v.is_file());
                 get_checksum(
@@ -68,17 +68,17 @@ impl ZarrEntry {
 
     pub fn is_file(&self) -> bool {
         match &self {
-            ZarrEntry::File { .. } => true,
-            ZarrEntry::Directory { .. } => false,
+            ChecksumTree::File { .. } => true,
+            ChecksumTree::Directory { .. } => false,
         }
     }
 
-    // Should this return a Result?
+    // TODO: Should this return a Result?  (Error type name: Tree(Build?)Error?)
     pub fn add_path<P: AsRef<Path>>(&mut self, path: P, checksum: &str, size: u64) {
         let path = path.as_ref();
         match self {
-            ZarrEntry::File { .. } => panic!("Cannot add a path to a file"),
-            ZarrEntry::Directory { children, .. } => {
+            ChecksumTree::File { .. } => panic!("Cannot add a path to a file"),
+            ChecksumTree::Directory { children, .. } => {
                 let mut parts = Vec::new();
                 for p in path.components() {
                     match p {
@@ -99,15 +99,15 @@ impl ZarrEntry {
                     dpath.push(&dirname);
                     match d
                         .entry(dirname.clone())
-                        .or_insert_with(ZarrEntry::directory)
+                        .or_insert_with(ChecksumTree::directory)
                     {
-                        ZarrEntry::File { .. } => {
+                        ChecksumTree::File { .. } => {
                             panic!("Path type conflict for {}", dpath.display())
                         }
-                        ZarrEntry::Directory { children, .. } => d = children,
+                        ChecksumTree::Directory { children, .. } => d = children,
                     }
                 }
-                let entry = ZarrEntry::file(ZarrChecksum {
+                let entry = ChecksumTree::file(ZarrChecksum {
                     checksum: checksum.to_string(),
                     size,
                     file_count: 1,
@@ -124,15 +124,15 @@ impl ZarrEntry {
     }
 }
 
-impl Default for ZarrEntry {
+impl Default for ChecksumTree {
     fn default() -> Self {
-        ZarrEntry::new()
+        ChecksumTree::new()
     }
 }
 
-impl FromIterator<FileInfo> for ZarrEntry {
+impl FromIterator<FileInfo> for ChecksumTree {
     fn from_iter<I: IntoIterator<Item = FileInfo>>(iter: I) -> Self {
-        let mut zarr = ZarrEntry::directory();
+        let mut zarr = ChecksumTree::directory();
         for info in iter {
             zarr.add_file_info(info);
         }
@@ -192,7 +192,10 @@ pub fn get_checksum(
 }
 
 pub fn compile_checksum<I: IntoIterator<Item = FileInfo>>(seq: I) -> String {
-    seq.into_iter().collect::<ZarrEntry>().checksum().checksum
+    seq.into_iter()
+        .collect::<ChecksumTree>()
+        .checksum()
+        .checksum
 }
 
 pub fn try_compile_checksum<I: IntoIterator<Item = Result<FileInfo, E>>, E>(
@@ -200,7 +203,7 @@ pub fn try_compile_checksum<I: IntoIterator<Item = Result<FileInfo, E>>, E>(
 ) -> Result<String, E> {
     Ok(seq
         .into_iter()
-        .collect::<Result<ZarrEntry, E>>()?
+        .collect::<Result<ChecksumTree, E>>()?
         .checksum()
         .checksum)
 }
@@ -331,8 +334,8 @@ mod test {
     }
 
     #[test]
-    fn test_tree_checksum() {
-        let mut sample = ZarrEntry::directory();
+    fn test_checksum_tree() {
+        let mut sample = ChecksumTree::directory();
         sample.add_path("arr_0/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315);
         sample.add_path("arr_0/0", "ed4e934a474f1d2096846c6248f18c00", 431);
         sample.add_path("arr_1/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315);
@@ -373,7 +376,7 @@ mod test {
                 size: 24,
             },
         ];
-        let sample = ZarrEntry::from_iter(files);
+        let sample = ChecksumTree::from_iter(files);
         assert_eq!(
             sample.checksum().checksum,
             "4313ab36412db2981c3ed391b38604d6-5--1516"
