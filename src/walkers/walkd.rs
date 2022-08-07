@@ -4,8 +4,9 @@ use std::path::Path;
 use walkdir::WalkDir;
 
 pub fn walkdir_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrError> {
+    let dirpath = dirpath.as_ref();
     try_compile_checksum(
-        WalkDir::new(dirpath.as_ref())
+        WalkDir::new(dirpath)
             .into_iter()
             // We can't use walkdir's filter_entry(), because that prevents
             // descending into directories that don't match the predicate.
@@ -18,7 +19,7 @@ pub fn walkdir_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrError>
             .map(|r| {
                 r.map_or_else(
                     |exc| Err(ZarrError::walkdir_error(exc)),
-                    |e| FileInfo::for_file(e.path(), dirpath.as_ref()),
+                    |e| FileInfo::for_file(e.path(), dirpath),
                 )
             }),
     )

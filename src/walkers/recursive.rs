@@ -15,7 +15,7 @@ fn recurse(path: &Path, basepath: &Path) -> Result<ZarrChecksum, ZarrError> {
     let files = files
         .into_iter()
         .map(|DirEntry { path, name, .. }| {
-            FileInfo::for_file(path, basepath.into()).map(|info| (name, ZarrChecksum::from(info)))
+            FileInfo::for_file(path, basepath).map(|info| (name, ZarrChecksum::from(info)))
         })
         .collect::<Result<HashMap<String, ZarrChecksum>, ZarrError>>()?;
     let directories = directories

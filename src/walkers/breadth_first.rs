@@ -5,9 +5,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub fn breadth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrError> {
+    let dirpath = dirpath.as_ref();
     try_compile_checksum(
-        BreadthFirstIterator::new(dirpath.as_ref())
-            .map(|r| r.and_then(|p| FileInfo::for_file(p, dirpath.as_ref().into()))),
+        BreadthFirstIterator::new(dirpath).map(|r| r.and_then(|p| FileInfo::for_file(p, dirpath))),
     )
 }
 

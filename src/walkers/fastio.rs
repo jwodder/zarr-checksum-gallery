@@ -119,7 +119,7 @@ pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<Str
                         }
                         files
                             .into_iter()
-                            .map(|DirEntry { path, .. }| FileInfo::for_file(&path, &basepath))
+                            .map(|DirEntry { path, .. }| FileInfo::for_file(path, &basepath))
                             .collect()
                     }
                     Err(e) => vec![Err(e)],

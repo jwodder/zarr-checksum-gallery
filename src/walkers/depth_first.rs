@@ -75,7 +75,7 @@ pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrEr
                 } else {
                     topdir
                         .entries
-                        .add_file(name, FileInfo::for_file(&path, &dirpath)?);
+                        .add_file(name, FileInfo::for_file(path, &dirpath)?);
                 }
             }
             Some(Err(e)) => return Err(ZarrError::readdir_error(&topdir.path, e)),

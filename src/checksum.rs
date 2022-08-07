@@ -150,7 +150,11 @@ pub struct FileInfo {
 }
 
 impl FileInfo {
-    pub fn for_file<P: AsRef<Path>>(path: P, basepath: P) -> Result<FileInfo, ZarrError> {
+    pub fn for_file<P, Q>(path: P, basepath: Q) -> Result<FileInfo, ZarrError>
+    where
+        P: AsRef<Path>,
+        Q: AsRef<Path>,
+    {
         let path = path.as_ref();
         let basepath = basepath.as_ref();
         let relpath = path
