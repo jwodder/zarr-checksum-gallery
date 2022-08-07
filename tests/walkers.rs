@@ -1,5 +1,9 @@
+extern crate rstest_reuse;
+
 use dandi_zarr_checksum::*;
 use fs_extra::dir;
+use rstest::rstest;
+use rstest_reuse::{apply, template};
 use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
 use tempfile::{tempdir, TempDir};
@@ -71,110 +75,40 @@ fn empty_dir() -> TestCase {
     }
 }
 
-#[test]
-fn test_walkdir_checksum() {
-    let case = sample1();
+#[template]
+#[rstest]
+#[case(sample1())]
+#[case(sample2())]
+#[case(empty_dir())]
+fn test_cases(#[case] case: TestCase) {}
+
+#[apply(test_cases)]
+fn test_walkdir_checksum(#[case] case: TestCase) {
     assert_eq!(walkdir_checksum(case.path()).unwrap(), case.checksum());
 }
 
-#[test]
-fn test_walkdir_checksum2() {
-    let case = sample2();
-    assert_eq!(walkdir_checksum(case.path()).unwrap(), case.checksum());
-}
-
-#[test]
-fn test_walkdir_checksum_empty_dir() {
-    let case = empty_dir();
-    assert_eq!(walkdir_checksum(case.path()).unwrap(), case.checksum());
-}
-
-#[test]
-fn test_recursive_checksum() {
-    let case = sample1();
+#[apply(test_cases)]
+fn test_recursive_checksum(#[case] case: TestCase) {
     assert_eq!(recursive_checksum(case.path()).unwrap(), case.checksum());
 }
 
-#[test]
-fn test_recursive_checksum2() {
-    let case = sample2();
-    assert_eq!(recursive_checksum(case.path()).unwrap(), case.checksum());
-}
-
-#[test]
-fn test_recursive_checksum_empty_dir() {
-    let case = empty_dir();
-    assert_eq!(recursive_checksum(case.path()).unwrap(), case.checksum());
-}
-
-#[test]
-fn test_breadth_first_checksum() {
-    let case = sample1();
+#[apply(test_cases)]
+fn test_breadth_first_checksum(#[case] case: TestCase) {
     assert_eq!(
         breadth_first_checksum(case.path()).unwrap(),
         case.checksum()
     );
 }
 
-#[test]
-fn test_breadth_first_checksum2() {
-    let case = sample2();
-    assert_eq!(
-        breadth_first_checksum(case.path()).unwrap(),
-        case.checksum()
-    );
-}
-
-#[test]
-fn test_breadth_first_checksum_empty_dir() {
-    let case = empty_dir();
-    assert_eq!(
-        breadth_first_checksum(case.path()).unwrap(),
-        case.checksum()
-    );
-}
-
-#[test]
-fn test_fastio_checksum() {
-    let case = sample1();
+#[apply(test_cases)]
+fn test_fastio_checksum(#[case] case: TestCase) {
     assert_eq!(
         fastio_checksum(case.path(), num_cpus::get()).unwrap(),
         case.checksum()
     );
 }
 
-#[test]
-fn test_fastio_checksum2() {
-    let case = sample2();
-    assert_eq!(
-        fastio_checksum(case.path(), num_cpus::get()).unwrap(),
-        case.checksum()
-    );
-}
-
-#[test]
-fn test_fastio_checksum_empty_dir() {
-    let case = empty_dir();
-    assert_eq!(
-        fastio_checksum(case.path(), num_cpus::get()).unwrap(),
-        case.checksum()
-    );
-}
-
-#[test]
-fn test_depth_first_checksum() {
-    let case = sample1();
-    assert_eq!(depth_first_checksum(case.path()).unwrap(), case.checksum());
-}
-
-#[test]
-fn test_depth_first_checksum2() {
-    let case = sample2();
-    assert_eq!(depth_first_checksum(case.path()).unwrap(), case.checksum());
-}
-
-#[test]
-fn test_depth_first_checksum_empty_dir() {
-    let case = empty_dir();
+#[apply(test_cases)]
+fn test_depth_first_checksum(#[case] case: TestCase) {
     assert_eq!(depth_first_checksum(case.path()).unwrap(), case.checksum());
 }
