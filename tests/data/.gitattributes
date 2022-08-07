@@ -1,0 +1,2 @@
+# Ensure JSON files aren't convered to DOS line endings on Windows:
+* eol=lf
