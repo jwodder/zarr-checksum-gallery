@@ -1,3 +1,4 @@
+use super::util::decode_filename;
 use crate::checksum::{get_checksum, FileInfo, ZarrChecksum};
 use crate::error::ZarrError;
 use std::collections::HashMap;
@@ -64,8 +65,7 @@ pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrEr
         match topdir.handle.next() {
             Some(Ok(p)) => {
                 let path = p.path();
-                // TODO: Add a dedicated ZarrError variant for this failure:
-                let name = p.file_name().to_str().unwrap().to_string();
+                let name = decode_filename(p.file_name())?;
                 let is_dir = p
                     .file_type()
                     .map_err(|e| ZarrError::stat_error(&p.path(), e))?

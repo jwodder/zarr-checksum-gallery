@@ -1,8 +1,9 @@
 use crate::error::ZarrError;
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub struct DirEntry {
+pub(crate) struct DirEntry {
     path: PathBuf,
     name: String,
     is_dir: bool,
@@ -22,13 +23,12 @@ impl DirEntry {
     }
 }
 
-pub fn listdir<P: AsRef<Path>>(dirpath: P) -> Result<Vec<DirEntry>, ZarrError> {
+pub(crate) fn listdir<P: AsRef<Path>>(dirpath: P) -> Result<Vec<DirEntry>, ZarrError> {
     let mut entries = Vec::new();
     for p in fs::read_dir(&dirpath).map_err(|e| ZarrError::readdir_error(&dirpath, e))? {
         let p = p.map_err(|e| ZarrError::readdir_error(&dirpath, e))?;
         let path = p.path();
-        // TODO: Add a dedicated ZarrError variant for this failure:
-        let name = p.file_name().to_str().unwrap().to_string();
+        let name = decode_filename(p.file_name())?;
         let is_dir = p
             .file_type()
             .map_err(|e| ZarrError::stat_error(&p.path(), e))?
@@ -36,4 +36,8 @@ pub fn listdir<P: AsRef<Path>>(dirpath: P) -> Result<Vec<DirEntry>, ZarrError> {
         entries.push(DirEntry { path, name, is_dir });
     }
     Ok(entries)
+}
+
+pub(crate) fn decode_filename(name: OsString) -> Result<String, ZarrError> {
+    name.into_string().map_err(ZarrError::filename_decode_error)
 }

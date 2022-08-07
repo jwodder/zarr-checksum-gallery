@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -22,6 +23,10 @@ pub enum ZarrError {
         #[from]
         source: WDError,
     },
+
+    #[error("Could not decode filename {:?}", .filename)]
+    // TODO: Should this include the path of the containing directory?
+    FilenameDecodeError { filename: OsString },
 }
 
 impl ZarrError {
@@ -55,5 +60,9 @@ impl ZarrError {
 
     pub fn walkdir_error(e: WDError) -> Self {
         e.into()
+    }
+
+    pub fn filename_decode_error(filename: OsString) -> Self {
+        ZarrError::FilenameDecodeError { filename }
     }
 }

@@ -1,4 +1,4 @@
-use super::listdir::listdir;
+use super::util::listdir;
 use crate::checksum::{try_compile_checksum, FileInfo};
 use crate::error::ZarrError;
 use log::{debug, info, warn};

@@ -1,4 +1,4 @@
-use super::listdir::listdir;
+use super::util::listdir;
 use crate::checksum::{get_checksum, FileInfo, ZarrChecksum};
 use crate::error::ZarrError;
 use std::collections::HashMap;
