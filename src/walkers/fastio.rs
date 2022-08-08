@@ -59,11 +59,13 @@ impl<T> JobStack<T> {
 
     fn shutdown(&self) {
         let mut data = self.data.lock().unwrap();
-        trace!("Shutting down stack");
-        data.jobs -= data.queue.len();
-        data.queue.clear();
-        data.shutdown = true;
-        self.cond.notify_all();
+        if !data.shutdown {
+            trace!("Shutting down stack");
+            data.jobs -= data.queue.len();
+            data.queue.clear();
+            data.shutdown = true;
+            self.cond.notify_all();
+        }
     }
 
     fn is_shutdown(&self) -> bool {
@@ -132,7 +134,11 @@ impl<T> Drop for JobStackItem<'_, T> {
 
 pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<String, WalkError> {
     let dirpath = dirpath.as_ref();
-    let stack = Arc::new(JobStack::new([dirpath.to_path_buf()]));
+    let stack = Arc::new(JobStack::new([DirEntry {
+        path: dirpath.to_path_buf(),
+        name: String::new(),
+        is_dir: true,
+    }]));
     let (sender, receiver) = channel();
     for i in 0..threads {
         let basepath = dirpath.to_path_buf();
@@ -140,45 +146,37 @@ pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<Str
         let sender = sender.clone();
         thread::spawn(move || {
             trace!("[{i}] Starting thread");
-            for path in stack.iter() {
-                trace!("[{i}] Popped {} from stack", path.display());
-                let result = match listdir(&*path) {
-                    Ok(entries) => {
-                        let (dirs, files): (Vec<_>, Vec<_>) =
-                            entries.into_iter().partition(|e| e.is_dir);
-                        stack.extend(
-                            dirs.into_iter()
-                                .map(|d| d.path)
-                                .inspect(|d| trace!("[{i}] Pushing {} onto stack", d.display())),
-                        );
-                        files
-                            .into_iter()
-                            .map(|DirEntry { path, .. }| FileInfo::for_file(path, &basepath))
-                            .collect::<Result<Vec<FileInfo>, WalkError>>()
-                    }
-                    Err(e) => Err(e),
-                };
-                let output = match result {
-                    Ok(infos) => {
-                        // If we've shut down, don't send anything except Errs
-                        if stack.is_shutdown() {
-                            Vec::new()
-                        } else {
-                            infos.into_iter().map(Ok).collect()
+            for entry in stack.iter() {
+                trace!("[{i}] Popped {:?} from stack", *entry);
+                let output = if entry.is_dir {
+                    match listdir(&entry.path) {
+                        Ok(entries) => {
+                            stack.extend(
+                                entries
+                                    .into_iter()
+                                    .inspect(|n| trace!("[{i}] Pushing {n:?} onto stack")),
+                            );
+                            None
                         }
+                        Err(e) => Some(Err(e)),
                     }
-                    Err(e) => {
-                        stack.shutdown();
-                        vec![Err(e)]
-                    }
+                } else {
+                    Some(FileInfo::for_file(&entry.path, &basepath))
                 };
-                for v in output {
-                    trace!("[{i}] Sending {v:?} to output");
-                    match sender.send(v) {
-                        Ok(_) => (),
-                        Err(_) => {
-                            warn!("[{i}] Failed to send; exiting");
-                            return;
+                if let Some(v) = output {
+                    // If we've shut down, don't send anything except Errs
+                    if v.is_err() || !stack.is_shutdown() {
+                        if v.is_err() {
+                            stack.shutdown();
+                        }
+                        trace!("[{i}] Sending {v:?} to output");
+                        match sender.send(v) {
+                            Ok(_) => (),
+                            Err(_) => {
+                                warn!("[{i}] Failed to send; exiting");
+                                stack.shutdown();
+                                return;
+                            }
                         }
                     }
                 }

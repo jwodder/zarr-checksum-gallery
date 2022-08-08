@@ -3,6 +3,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+#[derive(Debug)]
 pub(crate) struct DirEntry {
     pub(crate) path: PathBuf,
     pub(crate) name: String,
