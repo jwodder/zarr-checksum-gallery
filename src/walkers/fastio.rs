@@ -33,11 +33,25 @@ impl<T> JobStack<T> {
         }
     }
 
+    /*
     fn push(&self, item: T) {
         let mut data = self.data.lock().unwrap();
         if !data.shutdown {
             data.queue.push(item);
             data.tasks += 1;
+            trace!("Task count incremented to {}", data.tasks);
+            self.cond.notify_one();
+        }
+    }
+    */
+
+    // We can't impl Extend, as that requires the receiver to be mut
+    fn extend<I: IntoIterator<Item = T>>(&self, iter: I) {
+        let mut data = self.data.lock().unwrap();
+        if !data.shutdown {
+            let prelen = data.queue.len();
+            data.queue.extend(iter);
+            data.tasks += data.queue.len() - prelen;
             trace!("Task count incremented to {}", data.tasks);
             self.cond.notify_one();
         }
@@ -132,11 +146,11 @@ pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<Str
                     Ok(entries) => {
                         let (dirs, files): (Vec<_>, Vec<_>) =
                             entries.into_iter().partition(|e| e.is_dir);
-                        for DirEntry { path: d, .. } in dirs {
-                            trace!("[{i}] Pushing {} onto stack", d.display());
-                            // TODO: Add & use an `Extend` impl
-                            stack.push(d);
-                        }
+                        stack.extend(
+                            dirs.into_iter()
+                                .map(|d| d.path)
+                                .inspect(|d| trace!("[{i}] Pushing {} onto stack", d.display())),
+                        );
                         files
                             .into_iter()
                             .map(|DirEntry { path, .. }| FileInfo::for_file(path, &basepath))
