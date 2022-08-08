@@ -27,6 +27,9 @@ pub enum ZarrError {
     #[error("Could not decode filename {:?}", .filename)]
     // TODO: Should this include the path of the containing directory?
     FilenameDecodeError { filename: OsString },
+
+    #[error("Root path of traversal is not a directory: {}", .path.display())]
+    NotDirRootError { path: PathBuf },
 }
 
 impl ZarrError {
@@ -64,5 +67,11 @@ impl ZarrError {
 
     pub fn filename_decode_error(filename: OsString) -> Self {
         ZarrError::FilenameDecodeError { filename }
+    }
+
+    pub fn not_dir_root_error<P: AsRef<Path>>(path: P) -> Self {
+        ZarrError::NotDirRootError {
+            path: path.as_ref().into(),
+        }
     }
 }

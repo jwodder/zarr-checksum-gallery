@@ -157,6 +157,7 @@ impl FileInfo {
     {
         let path = path.as_ref();
         let basepath = basepath.as_ref();
+        // TODO: Also map empty relpaths to strip_prefix_error
         let relpath = path
             .strip_prefix(PathBuf::from(basepath))
             .map_err(|_| ZarrError::strip_prefix_error(&path, &basepath))?
