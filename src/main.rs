@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
-use dandi_zarr_checksum::*;
 use std::path::PathBuf;
+use zarr_checksum_gallery::*;
 
 #[derive(Clone, Debug, Eq, Parser, PartialEq)]
 #[clap(version)]

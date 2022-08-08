@@ -1,13 +1,13 @@
 extern crate rstest_reuse;
 
 use cfg_if::cfg_if;
-use dandi_zarr_checksum::*;
 use fs_extra::dir;
 use rstest::rstest;
 use rstest_reuse::{apply, template};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::{tempdir, NamedTempFile, TempDir};
+use zarr_checksum_gallery::*;
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
