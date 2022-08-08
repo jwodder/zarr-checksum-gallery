@@ -1,10 +1,10 @@
 use super::util::{listdir, DirEntry};
 use crate::checksum::{get_checksum, FileInfo, ZarrChecksum};
-use crate::error::WalkError;
+use crate::errors::{ChecksumError, WalkError};
 use std::collections::HashMap;
 use std::path::Path;
 
-pub fn recursive_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, WalkError> {
+pub fn recursive_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumError> {
     let dirpath = dirpath.as_ref().to_path_buf();
     Ok(recurse(&dirpath, &dirpath)?.checksum)
 }

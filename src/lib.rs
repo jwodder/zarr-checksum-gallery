@@ -1,5 +1,5 @@
 pub mod checksum;
-pub mod error;
+pub mod errors;
 pub mod walkers;
-pub use error::WalkError;
+pub use errors::*;
 pub use walkers::*;

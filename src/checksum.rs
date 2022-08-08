@@ -1,5 +1,5 @@
 mod json;
-use crate::error::WalkError;
+use crate::errors::{ChecksumError, ChecksumTreeError, WalkError};
 use json::get_checksum_json;
 use md5::{Digest, Md5};
 use std::collections::HashMap;
@@ -74,11 +74,15 @@ impl ChecksumTree {
         }
     }
 
-    // TODO: Should this return a Result?  (Error type name: Tree(Build?)Error?)
-    pub fn add_file<P: AsRef<Path>>(&mut self, relpath: P, checksum: &str, size: u64) {
+    pub fn add_file<P: AsRef<Path>>(
+        &mut self,
+        relpath: P,
+        checksum: &str,
+        size: u64,
+    ) -> Result<(), ChecksumTreeError> {
         let relpath = relpath.as_ref();
         match self {
-            ChecksumTree::File { .. } => panic!("Cannot add a path to a file"),
+            ChecksumTree::File { .. } => Err(ChecksumTreeError::path_type_conflict("<root>")),
             ChecksumTree::Directory { children, .. } => {
                 let mut parts = Vec::new();
                 for p in relpath.components() {
@@ -87,14 +91,14 @@ impl ChecksumTree {
                             Some(name) => parts.push(name.to_string()),
                             // TODO: Replace `P` with a relative_path type so
                             // that this is caught earlier:
-                            None => panic!("Non-UTF-8 path: {:?}", relpath),
+                            None => return Err(ChecksumTreeError::path_decode_error(relpath)),
                         },
-                        _ => panic!("Non-normalized or absolute path: {}", relpath.display()),
+                        _ => return Err(ChecksumTreeError::invalid_path(relpath)),
                     }
                 }
                 let basename = match parts.pop() {
                     Some(s) => s,
-                    None => panic!("Empty path"),
+                    None => return Err(ChecksumTreeError::invalid_path(relpath)),
                 };
                 let mut d = children;
                 let mut dpath = PathBuf::new();
@@ -105,7 +109,7 @@ impl ChecksumTree {
                         .or_insert_with(ChecksumTree::directory)
                     {
                         ChecksumTree::File { .. } => {
-                            panic!("Path type conflict for {}", dpath.display())
+                            return Err(ChecksumTreeError::path_type_conflict(dpath))
                         }
                         ChecksumTree::Directory { children, .. } => d = children,
                     }
@@ -115,31 +119,33 @@ impl ChecksumTree {
                     size,
                     file_count: 1,
                 });
+                // TODO: Prevent the double-add from happening
                 if d.insert(basename, entry).is_some() {
-                    panic!("File {} encountered twice", relpath.display());
+                    return Err(ChecksumTreeError::double_add(relpath));
                 }
+                Ok(())
             }
         }
     }
 
-    pub fn add_file_info(&mut self, info: FileInfo) {
-        self.add_file(info.relpath, &info.md5_digest, info.size);
+    pub fn add_file_info(&mut self, info: FileInfo) -> Result<(), ChecksumTreeError> {
+        self.add_file(info.relpath, &info.md5_digest, info.size)
+    }
+
+    fn from_file_info<I: IntoIterator<Item = FileInfo>>(
+        iter: I,
+    ) -> Result<ChecksumTree, ChecksumTreeError> {
+        let mut zarr = ChecksumTree::directory();
+        for info in iter {
+            zarr.add_file_info(info)?;
+        }
+        Ok(zarr)
     }
 }
 
 impl Default for ChecksumTree {
     fn default() -> Self {
         ChecksumTree::new()
-    }
-}
-
-impl FromIterator<FileInfo> for ChecksumTree {
-    fn from_iter<I: IntoIterator<Item = FileInfo>>(iter: I) -> Self {
-        let mut zarr = ChecksumTree::directory();
-        for info in iter {
-            zarr.add_file_info(info);
-        }
-        zarr
     }
 }
 
@@ -204,21 +210,21 @@ pub fn get_checksum(
     }
 }
 
-pub fn compile_checksum<I: IntoIterator<Item = FileInfo>>(seq: I) -> String {
-    seq.into_iter()
-        .collect::<ChecksumTree>()
-        .checksum()
-        .checksum
+pub fn compile_checksum<I: IntoIterator<Item = FileInfo>>(
+    iter: I,
+) -> Result<String, ChecksumTreeError> {
+    Ok(ChecksumTree::from_file_info(iter)?.checksum().checksum)
 }
 
-pub fn try_compile_checksum<I: IntoIterator<Item = Result<FileInfo, E>>, E>(
-    seq: I,
-) -> Result<String, E> {
-    Ok(seq
-        .into_iter()
-        .collect::<Result<ChecksumTree, E>>()?
-        .checksum()
-        .checksum)
+pub fn try_compile_checksum<I>(iter: I) -> Result<String, ChecksumError>
+where
+    I: IntoIterator<Item = Result<FileInfo, WalkError>>,
+{
+    let mut zarr = ChecksumTree::directory();
+    for info in iter {
+        zarr.add_file_info(info?)?;
+    }
+    Ok(zarr.checksum().checksum)
 }
 
 pub fn md5_string(s: &str) -> String {
@@ -349,11 +355,21 @@ mod test {
     #[test]
     fn test_checksum_tree() {
         let mut sample = ChecksumTree::directory();
-        sample.add_file("arr_0/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315);
-        sample.add_file("arr_0/0", "ed4e934a474f1d2096846c6248f18c00", 431);
-        sample.add_file("arr_1/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315);
-        sample.add_file("arr_1/0", "fba4dee03a51bde314e9713b00284a93", 431);
-        sample.add_file(".zgroup", "e20297935e73dd0154104d4ea53040ab", 24);
+        sample
+            .add_file("arr_0/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315)
+            .unwrap();
+        sample
+            .add_file("arr_0/0", "ed4e934a474f1d2096846c6248f18c00", 431)
+            .unwrap();
+        sample
+            .add_file("arr_1/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315)
+            .unwrap();
+        sample
+            .add_file("arr_1/0", "fba4dee03a51bde314e9713b00284a93", 431)
+            .unwrap();
+        sample
+            .add_file(".zgroup", "e20297935e73dd0154104d4ea53040ab", 24)
+            .unwrap();
         assert_eq!(
             sample.checksum().checksum,
             "4313ab36412db2981c3ed391b38604d6-5--1516"
@@ -361,7 +377,7 @@ mod test {
     }
 
     #[test]
-    fn test_from_iter() {
+    fn test_from_file_info() {
         let files = vec![
             FileInfo {
                 relpath: "arr_0/.zarray".into(),
@@ -389,7 +405,7 @@ mod test {
                 size: 24,
             },
         ];
-        let sample = ChecksumTree::from_iter(files);
+        let sample = ChecksumTree::from_file_info(files).unwrap();
         assert_eq!(
             sample.checksum().checksum,
             "4313ab36412db2981c3ed391b38604d6-5--1516"

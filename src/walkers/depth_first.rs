@@ -1,6 +1,6 @@
 use super::util::decode_filename;
 use crate::checksum::{get_checksum, FileInfo, ZarrChecksum};
-use crate::error::WalkError;
+use crate::errors::{ChecksumError, WalkError};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -51,7 +51,7 @@ impl ZarrDirectory {
     }
 }
 
-pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, WalkError> {
+pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumError> {
     let dirpath = PathBuf::from(dirpath.as_ref());
     let mut dirstack = vec![OpenDir::new(&dirpath, String::new())?];
     loop {
@@ -72,7 +72,7 @@ pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, WalkEr
                         .add_file(name, FileInfo::for_file(path, &dirpath)?);
                 }
             }
-            Some(Err(e)) => return Err(WalkError::readdir_error(&topdir.path, e)),
+            Some(Err(e)) => return Err(WalkError::readdir_error(&topdir.path, e).into()),
             None => {
                 let OpenDir { name, entries, .. } = dirstack.pop().unwrap();
                 match dirstack.last_mut() {

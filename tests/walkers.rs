@@ -24,7 +24,7 @@ enum Input {
 
 enum Expected {
     Checksum(&'static str),
-    Error(Box<dyn FnOnce(WalkError)>),
+    Error(Box<dyn FnOnce(ChecksumError)>),
 }
 
 struct TestCase {
@@ -41,7 +41,7 @@ impl TestCase {
         }
     }
 
-    fn check(self, output: Result<String, WalkError>) {
+    fn check(self, output: Result<String, ChecksumError>) {
         match (self.expected, output) {
             (Expected::Checksum(s), Ok(t)) => assert_eq!(s, t),
             (Expected::Error(func), Err(e)) => func(e),
@@ -99,7 +99,9 @@ fn unreadable_file() -> TestCase {
     fs::write(&path, "You will never see this.\n").unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
     let checker = move |e| match e {
-        WalkError::MD5FileError { path: epath, .. } => assert_eq!(path, epath),
+        ChecksumError::WalkError(WalkError::MD5FileError { path: epath, .. }) => {
+            assert_eq!(path, epath)
+        }
         e => panic!("Got unexpected error: {e}"),
     };
     TestCase {
@@ -121,8 +123,10 @@ fn unreadable_dir() -> TestCase {
         // cleaned up:
         fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
         match e {
-            WalkError::ReaddirError { path: epath, .. } => assert_eq!(path, epath),
-            WalkError::WalkdirError { .. } => (),
+            ChecksumError::WalkError(WalkError::ReaddirError { path: epath, .. }) => {
+                assert_eq!(path, epath)
+            }
+            ChecksumError::WalkError(WalkError::WalkdirError { .. }) => (),
             e => panic!("Got unexpected error: {e:?}"),
         }
     };
@@ -136,8 +140,12 @@ fn file_arg() -> TestCase {
     let tmpfile = NamedTempFile::new().unwrap();
     let path = tmpfile.path().to_path_buf();
     let checker = move |e| match e {
-        WalkError::ReaddirError { path: epath, .. } => assert_eq!(path, epath),
-        WalkError::NotDirRootError { path: epath } => assert_eq!(path, epath),
+        ChecksumError::WalkError(WalkError::ReaddirError { path: epath, .. }) => {
+            assert_eq!(path, epath)
+        }
+        ChecksumError::WalkError(WalkError::NotDirRootError { path: epath }) => {
+            assert_eq!(path, epath)
+        }
         e => panic!("Got unexpected error: {e:?}"),
     };
     TestCase {

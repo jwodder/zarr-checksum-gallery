@@ -24,7 +24,7 @@ pub enum WalkError {
         source: WDError,
     },
 
-    #[error("Could not decode filename {:?}", .filename)]
+    #[error("Could not decode filename {filename:?}")]
     // TODO: Should this include the path of the containing directory?
     FilenameDecodeError { filename: OsString },
 
@@ -74,4 +74,53 @@ impl WalkError {
             path: path.as_ref().into(),
         }
     }
+}
+
+#[derive(Debug, Error)]
+pub enum ChecksumTreeError {
+    #[error("Could not decode path {path:?}")]
+    PathDecodeError { path: PathBuf },
+
+    #[error("Invalid relative path {path:?}")]
+    InvalidPath { path: PathBuf },
+
+    #[error("Path type conflict error for {path:?}")]
+    PathTypeConflict { path: PathBuf },
+
+    #[error("File {path:?} added to checksum tree twice")]
+    DoubleAdd { path: PathBuf },
+}
+
+impl ChecksumTreeError {
+    pub fn path_decode_error<P: AsRef<Path>>(path: P) -> Self {
+        ChecksumTreeError::PathDecodeError {
+            path: path.as_ref().into(),
+        }
+    }
+
+    pub fn invalid_path<P: AsRef<Path>>(path: P) -> Self {
+        ChecksumTreeError::InvalidPath {
+            path: path.as_ref().into(),
+        }
+    }
+
+    pub fn path_type_conflict<P: AsRef<Path>>(path: P) -> Self {
+        ChecksumTreeError::PathTypeConflict {
+            path: path.as_ref().into(),
+        }
+    }
+
+    pub fn double_add<P: AsRef<Path>>(path: P) -> Self {
+        ChecksumTreeError::DoubleAdd {
+            path: path.as_ref().into(),
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum ChecksumError {
+    #[error(transparent)]
+    ChecksumTreeError(#[from] ChecksumTreeError),
+    #[error(transparent)]
+    WalkError(#[from] WalkError),
 }

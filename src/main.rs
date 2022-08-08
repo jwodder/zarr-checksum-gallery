@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
+use std::process::ExitCode;
 use zarr_checksum_gallery::*;
 
 #[derive(Clone, Debug, Eq, Parser, PartialEq)]
@@ -33,7 +34,19 @@ enum Command {
     },
 }
 
-fn main() -> Result<(), WalkError> {
+impl Command {
+    fn run(self) -> Result<String, ChecksumError> {
+        match self {
+            Command::BreadthFirst { dirpath } => breadth_first_checksum(dirpath),
+            Command::DepthFirst { dirpath } => depth_first_checksum(dirpath),
+            Command::Fastio { threads, dirpath } => fastio_checksum(dirpath, threads),
+            Command::Recursive { dirpath } => recursive_checksum(dirpath),
+            Command::Walkdir { dirpath } => walkdir_checksum(dirpath),
+        }
+    }
+}
+
+fn main() -> ExitCode {
     let args = Arguments::parse();
     if args.debug {
         fern::Dispatch::new()
@@ -45,13 +58,18 @@ fn main() -> Result<(), WalkError> {
             .apply()
             .unwrap();
     }
-    let checksum = match args.command {
-        Command::Walkdir { dirpath } => walkdir_checksum(dirpath),
-        Command::Recursive { dirpath } => recursive_checksum(dirpath),
-        Command::BreadthFirst { dirpath } => breadth_first_checksum(dirpath),
-        Command::DepthFirst { dirpath } => depth_first_checksum(dirpath),
-        Command::Fastio { threads, dirpath } => fastio_checksum(dirpath, threads),
-    };
-    println!("{}", checksum?);
-    Ok(())
+    match args.command.run() {
+        Ok(checksum) => {
+            println!("{}", checksum);
+            ExitCode::SUCCESS
+        }
+        Err(ChecksumError::ChecksumTreeError(e)) => {
+            eprintln!("INTERNAL ERROR: {e}");
+            ExitCode::FAILURE
+        }
+        Err(ChecksumError::WalkError(e)) => {
+            eprintln!("{e}");
+            ExitCode::FAILURE
+        }
+    }
 }
