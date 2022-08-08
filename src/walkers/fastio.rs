@@ -1,8 +1,7 @@
 use super::util::{listdir, DirEntry};
-use crate::checksum::{try_compile_checksum, FileInfo};
+use crate::checksum::{compile_checksum, FileInfo};
 use crate::error::ZarrError;
 use log::{trace, warn};
-use std::iter::once;
 use std::ops::Deref;
 use std::path::Path;
 use std::sync::mpsc::channel;
@@ -17,6 +16,7 @@ struct JobStack<T> {
 struct JobStackData<T> {
     queue: Vec<T>,
     tasks: usize,
+    shutdown: bool,
 }
 
 impl<T> JobStack<T> {
@@ -24,17 +24,32 @@ impl<T> JobStack<T> {
         let queue: Vec<T> = items.into_iter().collect();
         let tasks = queue.len();
         JobStack {
-            data: Mutex::new(JobStackData { queue, tasks }),
+            data: Mutex::new(JobStackData {
+                queue,
+                tasks,
+                shutdown: false,
+            }),
             cond: Condvar::new(),
         }
     }
 
     fn push(&self, item: T) {
         let mut data = self.data.lock().unwrap();
-        data.queue.push(item);
-        data.tasks += 1;
-        trace!("Task count incremented to {}", data.tasks);
-        self.cond.notify_one();
+        if !data.shutdown {
+            data.queue.push(item);
+            data.tasks += 1;
+            trace!("Task count incremented to {}", data.tasks);
+            self.cond.notify_one();
+        }
+    }
+
+    fn shutdown(&self) {
+        let mut data = self.data.lock().unwrap();
+        trace!("Shutting down stack");
+        data.tasks -= data.queue.len();
+        data.queue.clear();
+        data.shutdown = true;
+        self.cond.notify_all();
     }
 
     fn iter(&self) -> JobStackIterator<'_, T> {
@@ -53,8 +68,8 @@ impl<'a, T> Iterator for JobStackIterator<'a, T> {
         let mut data = self.stack.data.lock().unwrap();
         loop {
             trace!("Looping through JobStackIterator::next");
-            if data.tasks == 0 {
-                trace!("[JobStackIterator::next] tasks == 0; returning None");
+            if data.tasks == 0 || data.shutdown {
+                trace!("[JobStackIterator::next] no tasks; returning None");
                 return None;
             }
             match data.queue.pop() {
@@ -99,7 +114,7 @@ impl<T> Drop for JobStackItem<'_, T> {
 
 pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<String, ZarrError> {
     let dirpath = dirpath.as_ref();
-    let stack = Arc::new(JobStack::new(once(dirpath.to_path_buf())));
+    let stack = Arc::new(JobStack::new([dirpath.to_path_buf()]));
     let (sender, receiver) = channel();
     for i in 0..threads {
         let basepath = dirpath.to_path_buf();
@@ -109,7 +124,7 @@ pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<Str
             trace!("[{i}] Starting thread");
             for path in stack.iter() {
                 trace!("[{i}] Popped {} from stack", path.display());
-                let output = match listdir(&*path) {
+                let result = match listdir(&*path) {
                     Ok(entries) => {
                         let (dirs, files): (Vec<_>, Vec<_>) =
                             entries.into_iter().partition(|e| e.is_dir);
@@ -120,10 +135,19 @@ pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<Str
                         files
                             .into_iter()
                             .map(|DirEntry { path, .. }| FileInfo::for_file(path, &basepath))
-                            .collect()
+                            .collect::<Result<Vec<FileInfo>, ZarrError>>()
                     }
-                    Err(e) => vec![Err(e)],
+                    Err(e) => Err(e),
                 };
+                let output = match result {
+                    Ok(infos) => infos.into_iter().map(Ok).collect(),
+                    Err(e) => {
+                        stack.shutdown();
+                        vec![Err(e)]
+                    }
+                };
+                // TODO: If we've shut down, don't send anything except Errs
+                // (if possible, only the first error)
                 for v in output {
                     trace!("[{i}] Sending {v:?} to output");
                     match sender.send(v) {
@@ -139,5 +163,22 @@ pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<Str
         });
     }
     drop(sender);
-    try_compile_checksum(receiver)
+    // Force the receiver to receive everything (rather than breaking out early
+    // on an Err) in order to ensure that all threads run to completion
+    let mut infos = Vec::new();
+    let mut err = None;
+    for v in receiver {
+        match v {
+            Ok(i) => {
+                infos.push(i);
+            }
+            Err(e) => {
+                err.get_or_insert(e);
+            }
+        }
+    }
+    match err {
+        Some(e) => Err(e),
+        None => Ok(compile_checksum(infos)),
+    }
 }
