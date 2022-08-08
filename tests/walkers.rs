@@ -108,6 +108,30 @@ fn unreadable_file() -> TestCase {
     }
 }
 
+#[cfg(unix)]
+fn unreadable_dir() -> TestCase {
+    let tmp_path = tempdir().unwrap();
+    let opts = dir::CopyOptions {
+        content_only: true,
+        ..dir::CopyOptions::default()
+    };
+    dir::copy(sample1().path(), tmp_path.path(), &opts).unwrap();
+    let mut path = PathBuf::from(tmp_path.path());
+    path.push("arr_0");
+    path.push("unreadable");
+    fs::create_dir(&path).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
+    let checker = move |e| match e {
+        ZarrError::ReaddirError { path: epath, .. } => assert_eq!(path, epath),
+        ZarrError::WalkdirError { .. } => (),
+        e => panic!("Got unexpected error: {e:?}"),
+    };
+    TestCase {
+        input: Input::Temporary(tmp_path),
+        expected: Expected::Error(Box::new(checker)),
+    }
+}
+
 #[template]
 #[rstest]
 #[case(sample1())]
@@ -120,6 +144,7 @@ cfg_if! {
         #[template]
         #[apply(base_cases)]
         #[case(unreadable_file())]
+        #[case(unreadable_dir())]
         fn test_cases(#[case] case: TestCase) {}
     } else {
         #[template]
