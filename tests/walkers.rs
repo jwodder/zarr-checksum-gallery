@@ -108,22 +108,22 @@ fn unreadable_file() -> TestCase {
     }
 }
 
-// TODO: Look for a more compact way to write this
+#[template]
+#[rstest]
+#[case(sample1())]
+#[case(sample2())]
+#[case(empty_dir())]
+fn base_cases(#[case] case: TestCase) {}
+
 cfg_if! {
     if #[cfg(unix)] {
         #[template]
-        #[rstest]
-        #[case(sample1())]
-        #[case(sample2())]
-        #[case(empty_dir())]
+        #[apply(base_cases)]
         #[case(unreadable_file())]
         fn test_cases(#[case] case: TestCase) {}
     } else {
         #[template]
-        #[rstest]
-        #[case(sample1())]
-        #[case(sample2())]
-        #[case(empty_dir())]
+        #[apply(base_cases)]
         fn test_cases(#[case] case: TestCase) {}
     }
 }
