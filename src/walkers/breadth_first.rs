@@ -1,7 +1,7 @@
+use super::util::{listdir, DirEntry};
 use crate::checksum::{try_compile_checksum, FileInfo};
 use crate::error::ZarrError;
 use std::collections::VecDeque;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 pub fn breadth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrError> {
@@ -12,13 +12,18 @@ pub fn breadth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, Zarr
 }
 
 struct BreadthFirstIterator {
-    queue: VecDeque<Result<PathBuf, ZarrError>>,
+    queue: VecDeque<Result<DirEntry, ZarrError>>,
 }
 
 impl BreadthFirstIterator {
     fn new<P: AsRef<Path>>(dirpath: P) -> Self {
         BreadthFirstIterator {
-            queue: VecDeque::from([Ok(dirpath.as_ref().into())]),
+            // TODO: Verify that dirpath is indeed a directory?
+            queue: VecDeque::from([Ok(DirEntry {
+                path: dirpath.as_ref().into(),
+                name: String::new(),
+                is_dir: true,
+            })]),
         }
     }
 }
@@ -28,27 +33,15 @@ impl Iterator for BreadthFirstIterator {
 
     fn next(&mut self) -> Option<Result<PathBuf, ZarrError>> {
         loop {
-            let path = self.queue.pop_front()?;
-            // TODO: Try to simplify this code
-            match path {
-                Ok(path) => match fs::metadata(&path) {
-                    Ok(m) => {
-                        if m.is_dir() {
-                            match fs::read_dir(&path) {
-                                Ok(iter) => self.queue.extend(iter.map(|r| {
-                                    r.map_or_else(
-                                        |exc| Err(ZarrError::readdir_error(&path, exc)),
-                                        |e| Ok(e.path()),
-                                    )
-                                })),
-                                Err(e) => return Some(Err(ZarrError::readdir_error(&path, e))),
-                            }
-                        } else {
-                            return Some(Ok(path));
-                        }
-                    }
-                    Err(e) => return Some(Err(ZarrError::stat_error(&path, e))),
+            let entry = self.queue.pop_front()?;
+            match entry {
+                Ok(DirEntry {
+                    path, is_dir: true, ..
+                }) => match listdir(path) {
+                    Ok(entries) => self.queue.extend(entries.into_iter().map(Ok)),
+                    Err(e) => self.queue.push_back(Err(e)),
                 },
+                Ok(DirEntry { path, .. }) => return Some(Ok(path)),
                 Err(e) => return Some(Err(e)),
             }
         }
