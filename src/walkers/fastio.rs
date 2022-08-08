@@ -1,6 +1,6 @@
 use super::util::{listdir, DirEntry};
 use crate::checksum::{compile_checksum, FileInfo};
-use crate::error::ZarrError;
+use crate::error::WalkError;
 use log::{trace, warn};
 use std::ops::Deref;
 use std::path::Path;
@@ -112,7 +112,7 @@ impl<T> Drop for JobStackItem<'_, T> {
     }
 }
 
-pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<String, ZarrError> {
+pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<String, WalkError> {
     let dirpath = dirpath.as_ref();
     let stack = Arc::new(JobStack::new([dirpath.to_path_buf()]));
     let (sender, receiver) = channel();
@@ -135,7 +135,7 @@ pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<Str
                         files
                             .into_iter()
                             .map(|DirEntry { path, .. }| FileInfo::for_file(path, &basepath))
-                            .collect::<Result<Vec<FileInfo>, ZarrError>>()
+                            .collect::<Result<Vec<FileInfo>, WalkError>>()
                     }
                     Err(e) => Err(e),
                 };

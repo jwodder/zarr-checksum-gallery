@@ -1,6 +1,6 @@
 use super::util::decode_filename;
 use crate::checksum::{get_checksum, FileInfo, ZarrChecksum};
-use crate::error::ZarrError;
+use crate::error::WalkError;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -13,8 +13,8 @@ struct OpenDir {
 }
 
 impl OpenDir {
-    fn new<P: AsRef<Path>>(dirpath: P, name: String) -> Result<OpenDir, ZarrError> {
-        let handle = fs::read_dir(&dirpath).map_err(|e| ZarrError::readdir_error(&dirpath, e))?;
+    fn new<P: AsRef<Path>>(dirpath: P, name: String) -> Result<OpenDir, WalkError> {
+        let handle = fs::read_dir(&dirpath).map_err(|e| WalkError::readdir_error(&dirpath, e))?;
         Ok(OpenDir {
             handle,
             path: dirpath.as_ref().into(),
@@ -51,7 +51,7 @@ impl ZarrDirectory {
     }
 }
 
-pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrError> {
+pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, WalkError> {
     let dirpath = PathBuf::from(dirpath.as_ref());
     let mut dirstack = vec![OpenDir::new(&dirpath, String::new())?];
     loop {
@@ -62,7 +62,7 @@ pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrEr
                 let name = decode_filename(p.file_name())?;
                 let is_dir = p
                     .file_type()
-                    .map_err(|e| ZarrError::stat_error(&p.path(), e))?
+                    .map_err(|e| WalkError::stat_error(&p.path(), e))?
                     .is_dir();
                 if is_dir {
                     dirstack.push(OpenDir::new(path, name)?);
@@ -72,7 +72,7 @@ pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrEr
                         .add_file(name, FileInfo::for_file(path, &dirpath)?);
                 }
             }
-            Some(Err(e)) => return Err(ZarrError::readdir_error(&topdir.path, e)),
+            Some(Err(e)) => return Err(WalkError::readdir_error(&topdir.path, e)),
             None => {
                 let OpenDir { name, entries, .. } = dirstack.pop().unwrap();
                 match dirstack.last_mut() {

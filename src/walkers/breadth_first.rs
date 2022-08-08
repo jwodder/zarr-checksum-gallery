@@ -1,10 +1,10 @@
 use super::util::{listdir, DirEntry};
 use crate::checksum::{try_compile_checksum, FileInfo};
-use crate::error::ZarrError;
+use crate::error::WalkError;
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 
-pub fn breadth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrError> {
+pub fn breadth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, WalkError> {
     let dirpath = dirpath.as_ref();
     try_compile_checksum(
         BreadthFirstIterator::new(dirpath).map(|r| r.and_then(|p| FileInfo::for_file(p, dirpath))),
@@ -12,7 +12,7 @@ pub fn breadth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, Zarr
 }
 
 struct BreadthFirstIterator {
-    queue: VecDeque<Result<DirEntry, ZarrError>>,
+    queue: VecDeque<Result<DirEntry, WalkError>>,
 }
 
 impl BreadthFirstIterator {
@@ -29,9 +29,9 @@ impl BreadthFirstIterator {
 }
 
 impl Iterator for BreadthFirstIterator {
-    type Item = Result<PathBuf, ZarrError>;
+    type Item = Result<PathBuf, WalkError>;
 
-    fn next(&mut self) -> Option<Result<PathBuf, ZarrError>> {
+    fn next(&mut self) -> Option<Result<PathBuf, WalkError>> {
         loop {
             let entry = self.queue.pop_front()?;
             match entry {

@@ -24,7 +24,7 @@ enum Input {
 
 enum Expected {
     Checksum(&'static str),
-    Error(Box<dyn FnOnce(ZarrError)>),
+    Error(Box<dyn FnOnce(WalkError)>),
 }
 
 struct TestCase {
@@ -41,7 +41,7 @@ impl TestCase {
         }
     }
 
-    fn check(self, output: Result<String, ZarrError>) {
+    fn check(self, output: Result<String, WalkError>) {
         match (self.expected, output) {
             (Expected::Checksum(s), Ok(t)) => assert_eq!(s, t),
             (Expected::Error(func), Err(e)) => func(e),
@@ -99,7 +99,7 @@ fn unreadable_file() -> TestCase {
     fs::write(&path, "You will never see this.\n").unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
     let checker = move |e| match e {
-        ZarrError::MD5FileError { path: epath, .. } => assert_eq!(path, epath),
+        WalkError::MD5FileError { path: epath, .. } => assert_eq!(path, epath),
         e => panic!("Got unexpected error: {e}"),
     };
     TestCase {
@@ -117,8 +117,8 @@ fn unreadable_dir() -> TestCase {
     fs::create_dir(&path).unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
     let checker = move |e| match e {
-        ZarrError::ReaddirError { path: epath, .. } => assert_eq!(path, epath),
-        ZarrError::WalkdirError { .. } => (),
+        WalkError::ReaddirError { path: epath, .. } => assert_eq!(path, epath),
+        WalkError::WalkdirError { .. } => (),
         e => panic!("Got unexpected error: {e:?}"),
     };
     TestCase {
@@ -131,8 +131,8 @@ fn file_arg() -> TestCase {
     let tmpfile = NamedTempFile::new().unwrap();
     let path = tmpfile.path().to_path_buf();
     let checker = move |e| match e {
-        ZarrError::ReaddirError { path: epath, .. } => assert_eq!(path, epath),
-        ZarrError::NotDirRootError { path: epath } => assert_eq!(path, epath),
+        WalkError::ReaddirError { path: epath, .. } => assert_eq!(path, epath),
+        WalkError::NotDirRootError { path: epath } => assert_eq!(path, epath),
         e => panic!("Got unexpected error: {e:?}"),
     };
     TestCase {

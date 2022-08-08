@@ -5,7 +5,7 @@ use thiserror::Error;
 use walkdir::Error as WDError;
 
 #[derive(Debug, Error)]
-pub enum ZarrError {
+pub enum WalkError {
     #[error("Error digesting file: {}: {source}", .path.display())]
     MD5FileError { path: PathBuf, source: io::Error },
 
@@ -32,30 +32,30 @@ pub enum ZarrError {
     NotDirRootError { path: PathBuf },
 }
 
-impl ZarrError {
+impl WalkError {
     pub fn md5_file_error<P: AsRef<Path>>(path: P, source: io::Error) -> Self {
-        ZarrError::MD5FileError {
+        WalkError::MD5FileError {
             path: path.as_ref().into(),
             source,
         }
     }
 
     pub fn strip_prefix_error<P: AsRef<Path>>(path: P, basepath: P) -> Self {
-        ZarrError::StripPrefixError {
+        WalkError::StripPrefixError {
             path: path.as_ref().into(),
             basepath: basepath.as_ref().into(),
         }
     }
 
     pub fn stat_error<P: AsRef<Path>>(path: P, source: io::Error) -> Self {
-        ZarrError::StatError {
+        WalkError::StatError {
             path: path.as_ref().into(),
             source,
         }
     }
 
     pub fn readdir_error<P: AsRef<Path>>(path: P, source: io::Error) -> Self {
-        ZarrError::ReaddirError {
+        WalkError::ReaddirError {
             path: path.as_ref().into(),
             source,
         }
@@ -66,11 +66,11 @@ impl ZarrError {
     }
 
     pub fn filename_decode_error(filename: OsString) -> Self {
-        ZarrError::FilenameDecodeError { filename }
+        WalkError::FilenameDecodeError { filename }
     }
 
     pub fn not_dir_root_error<P: AsRef<Path>>(path: P) -> Self {
-        ZarrError::NotDirRootError {
+        WalkError::NotDirRootError {
             path: path.as_ref().into(),
         }
     }

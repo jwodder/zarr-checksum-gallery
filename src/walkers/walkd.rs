@@ -1,18 +1,18 @@
 use crate::checksum::{try_compile_checksum, FileInfo};
-use crate::error::ZarrError;
+use crate::error::WalkError;
 use std::fs::metadata;
 use std::path::Path;
 use walkdir::WalkDir;
 
-pub fn walkdir_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrError> {
+pub fn walkdir_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, WalkError> {
     let dirpath = dirpath.as_ref();
     // Without this check, walkdir will return only the file `dirpath`, leading
     // to an empty relative path error
     if !metadata(&dirpath)
-        .map_err(|e| ZarrError::stat_error(&dirpath, e))?
+        .map_err(|e| WalkError::stat_error(&dirpath, e))?
         .is_dir()
     {
-        return Err(ZarrError::not_dir_root_error(dirpath));
+        return Err(WalkError::not_dir_root_error(dirpath));
     }
     try_compile_checksum(
         WalkDir::new(dirpath)
@@ -27,7 +27,7 @@ pub fn walkdir_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ZarrError>
             })
             .map(|r| {
                 r.map_or_else(
-                    |exc| Err(ZarrError::walkdir_error(exc)),
+                    |exc| Err(WalkError::walkdir_error(exc)),
                     |e| FileInfo::for_file(e.path(), dirpath),
                 )
             }),

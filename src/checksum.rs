@@ -1,5 +1,5 @@
 use crate::checksum_json::get_checksum_json;
-use crate::error::ZarrError;
+use crate::error::WalkError;
 use md5::{Digest, Md5};
 use std::collections::HashMap;
 use std::fmt;
@@ -150,7 +150,7 @@ pub struct FileInfo {
 }
 
 impl FileInfo {
-    pub fn for_file<P, Q>(path: P, basepath: Q) -> Result<FileInfo, ZarrError>
+    pub fn for_file<P, Q>(path: P, basepath: Q) -> Result<FileInfo, WalkError>
     where
         P: AsRef<Path>,
         Q: AsRef<Path>,
@@ -160,13 +160,13 @@ impl FileInfo {
         // TODO: Also map empty relpaths to strip_prefix_error
         let relpath = path
             .strip_prefix(PathBuf::from(basepath))
-            .map_err(|_| ZarrError::strip_prefix_error(&path, &basepath))?
+            .map_err(|_| WalkError::strip_prefix_error(&path, &basepath))?
             .to_path_buf();
         Ok(FileInfo {
             relpath,
             md5_digest: md5_file(&path)?,
             size: fs::metadata(&path)
-                .map_err(|e| ZarrError::stat_error(&path, e))?
+                .map_err(|e| WalkError::stat_error(&path, e))?
                 .len(),
         })
     }
@@ -222,10 +222,10 @@ pub fn md5_string(s: &str) -> String {
     hex::encode(Md5::digest(s))
 }
 
-pub fn md5_file<P: AsRef<Path>>(path: P) -> Result<String, ZarrError> {
-    let mut file = fs::File::open(&path).map_err(|e| ZarrError::md5_file_error(&path, e))?;
+pub fn md5_file<P: AsRef<Path>>(path: P) -> Result<String, WalkError> {
+    let mut file = fs::File::open(&path).map_err(|e| WalkError::md5_file_error(&path, e))?;
     let mut hasher = Md5::new();
-    io::copy(&mut file, &mut hasher).map_err(|e| ZarrError::md5_file_error(&path, e))?;
+    io::copy(&mut file, &mut hasher).map_err(|e| WalkError::md5_file_error(&path, e))?;
     Ok(hex::encode(hasher.finalize()))
 }
 

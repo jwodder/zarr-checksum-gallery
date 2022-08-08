@@ -33,7 +33,7 @@ enum Command {
     },
 }
 
-fn main() -> Result<(), ZarrError> {
+fn main() -> Result<(), WalkError> {
     let args = Arguments::parse();
     if args.debug {
         fern::Dispatch::new()
