@@ -18,7 +18,6 @@ struct BreadthFirstIterator {
 impl BreadthFirstIterator {
     fn new<P: AsRef<Path>>(dirpath: P) -> Self {
         BreadthFirstIterator {
-            // TODO: Verify that dirpath is indeed a directory?
             queue: VecDeque::from([Ok(DirEntry {
                 path: dirpath.as_ref().into(),
                 name: String::new(),

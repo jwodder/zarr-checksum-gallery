@@ -52,6 +52,10 @@ impl<T> JobStack<T> {
         self.cond.notify_all();
     }
 
+    fn is_shutdown(&self) -> bool {
+        self.data.lock().unwrap().shutdown
+    }
+
     fn iter(&self) -> JobStackIterator<'_, T> {
         JobStackIterator { stack: self }
     }
@@ -130,6 +134,7 @@ pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<Str
                             entries.into_iter().partition(|e| e.is_dir);
                         for DirEntry { path: d, .. } in dirs {
                             trace!("[{i}] Pushing {} onto stack", d.display());
+                            // TODO: Add & use an `Extend` impl
                             stack.push(d);
                         }
                         files
@@ -140,14 +145,19 @@ pub fn fastio_checksum<P: AsRef<Path>>(dirpath: P, threads: usize) -> Result<Str
                     Err(e) => Err(e),
                 };
                 let output = match result {
-                    Ok(infos) => infos.into_iter().map(Ok).collect(),
+                    Ok(infos) => {
+                        // If we've shut down, don't send anything except Errs
+                        if stack.is_shutdown() {
+                            Vec::new()
+                        } else {
+                            infos.into_iter().map(Ok).collect()
+                        }
+                    }
                     Err(e) => {
                         stack.shutdown();
                         vec![Err(e)]
                     }
                 };
-                // TODO: If we've shut down, don't send anything except Errs
-                // (if possible, only the first error)
                 for v in output {
                     trace!("[{i}] Sending {v:?} to output");
                     match sender.send(v) {
