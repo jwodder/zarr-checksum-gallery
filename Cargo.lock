@@ -81,6 +81,7 @@ dependencies = [
 name = "dandi-zarr-checksum"
 version = "0.1.0"
 dependencies = [
+ "cfg-if",
  "clap",
  "fern",
  "fs_extra",
