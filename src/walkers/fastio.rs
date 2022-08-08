@@ -15,18 +15,18 @@ struct JobStack<T> {
 
 struct JobStackData<T> {
     queue: Vec<T>,
-    tasks: usize,
+    jobs: usize,
     shutdown: bool,
 }
 
 impl<T> JobStack<T> {
     fn new<I: IntoIterator<Item = T>>(items: I) -> Self {
         let queue: Vec<T> = items.into_iter().collect();
-        let tasks = queue.len();
+        let jobs = queue.len();
         JobStack {
             data: Mutex::new(JobStackData {
                 queue,
-                tasks,
+                jobs,
                 shutdown: false,
             }),
             cond: Condvar::new(),
@@ -38,8 +38,8 @@ impl<T> JobStack<T> {
         let mut data = self.data.lock().unwrap();
         if !data.shutdown {
             data.queue.push(item);
-            data.tasks += 1;
-            trace!("Task count incremented to {}", data.tasks);
+            data.jobs += 1;
+            trace!("Job count incremented to {}", data.jobs);
             self.cond.notify_one();
         }
     }
@@ -51,8 +51,8 @@ impl<T> JobStack<T> {
         if !data.shutdown {
             let prelen = data.queue.len();
             data.queue.extend(iter);
-            data.tasks += data.queue.len() - prelen;
-            trace!("Task count incremented to {}", data.tasks);
+            data.jobs += data.queue.len() - prelen;
+            trace!("Job count incremented to {}", data.jobs);
             self.cond.notify_all();
         }
     }
@@ -60,7 +60,7 @@ impl<T> JobStack<T> {
     fn shutdown(&self) {
         let mut data = self.data.lock().unwrap();
         trace!("Shutting down stack");
-        data.tasks -= data.queue.len();
+        data.jobs -= data.queue.len();
         data.queue.clear();
         data.shutdown = true;
         self.cond.notify_all();
@@ -86,8 +86,8 @@ impl<'a, T> Iterator for JobStackIterator<'a, T> {
         let mut data = self.stack.data.lock().unwrap();
         loop {
             trace!("Looping through JobStackIterator::next");
-            if data.tasks == 0 || data.shutdown {
-                trace!("[JobStackIterator::next] no tasks; returning None");
+            if data.jobs == 0 || data.shutdown {
+                trace!("[JobStackIterator::next] no jobs; returning None");
                 return None;
             }
             match data.queue.pop() {
@@ -122,9 +122,9 @@ impl<T> Deref for JobStackItem<'_, T> {
 impl<T> Drop for JobStackItem<'_, T> {
     fn drop(&mut self) {
         let mut data = self.stack.data.lock().unwrap();
-        data.tasks -= 1;
-        trace!("Task count decremented to {}", data.tasks);
-        if data.tasks == 0 {
+        data.jobs -= 1;
+        trace!("Job count decremented to {}", data.jobs);
+        if data.jobs == 0 {
             self.stack.cond.notify_all();
         }
     }
