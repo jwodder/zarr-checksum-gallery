@@ -2,6 +2,11 @@
 name = "zarr-checksum-gallery"
 version = "0.1.0"
 edition = "2021"
+description = "Various implementations of Dandi Zarr checksumming"
+authors = ["John Thorvald Wodder II <zarr-checksum-gallery@varonathe.org>"]
+repository = "https://github.com/jwodder/zarr-checksum-gallery-rust"
+license = "MIT"
+publish = false
 
 [dependencies]
 clap = { version = "3.2.8", default-features = false, features = ["derive", "std", "suggestions", "wrap_help"] }
