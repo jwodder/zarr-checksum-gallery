@@ -7,7 +7,7 @@ use rstest::rstest;
 use rstest_reuse::{apply, template};
 use std::fs;
 use std::path::{Path, PathBuf};
-use tempfile::{tempdir, TempDir};
+use tempfile::{tempdir, NamedTempFile, TempDir};
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -19,6 +19,7 @@ const SAMPLE_CHECKSUM: &str = "4313ab36412db2981c3ed391b38604d6-5--1516";
 enum Input {
     Permanent(PathBuf),
     Temporary(TempDir),
+    TempFile(NamedTempFile),
 }
 
 enum Expected {
@@ -36,6 +37,7 @@ impl TestCase {
         match &self.input {
             Input::Permanent(path) => path,
             Input::Temporary(dir) => dir.path(),
+            Input::TempFile(f) => f.path(),
         }
     }
 
@@ -125,11 +127,26 @@ fn unreadable_dir() -> TestCase {
     }
 }
 
+fn file_arg() -> TestCase {
+    let tmpfile = NamedTempFile::new().unwrap();
+    let path = tmpfile.path().to_path_buf();
+    let checker = move |e| match e {
+        ZarrError::ReaddirError { path: epath, .. } => assert_eq!(path, epath),
+        ZarrError::NotDirRootError { path: epath } => assert_eq!(path, epath),
+        e => panic!("Got unexpected error: {e:?}"),
+    };
+    TestCase {
+        input: Input::TempFile(tmpfile),
+        expected: Expected::Error(Box::new(checker)),
+    }
+}
+
 #[template]
 #[rstest]
 #[case(sample1())]
 #[case(sample2())]
 #[case(empty_dir())]
+#[case(file_arg())]
 fn base_cases(#[case] case: TestCase) {}
 
 cfg_if! {
