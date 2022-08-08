@@ -2,7 +2,7 @@ use crate::checksum::ZarrChecksum;
 use std::collections::HashMap;
 use std::fmt::{Error, Write};
 
-pub fn get_checksum_json(
+pub(super) fn get_checksum_json(
     files: HashMap<String, ZarrChecksum>,
     directories: HashMap<String, ZarrChecksum>,
 ) -> String {

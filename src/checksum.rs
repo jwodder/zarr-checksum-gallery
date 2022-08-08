@@ -1,5 +1,6 @@
-use crate::checksum_json::get_checksum_json;
+mod json;
 use crate::error::WalkError;
+use json::get_checksum_json;
 use md5::{Digest, Md5};
 use std::collections::HashMap;
 use std::fmt;
