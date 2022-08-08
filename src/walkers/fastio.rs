@@ -53,7 +53,7 @@ impl<T> JobStack<T> {
             data.queue.extend(iter);
             data.tasks += data.queue.len() - prelen;
             trace!("Task count incremented to {}", data.tasks);
-            self.cond.notify_one();
+            self.cond.notify_all();
         }
     }
 
