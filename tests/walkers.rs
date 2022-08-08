@@ -12,6 +12,8 @@ use tempfile::{tempdir, TempDir};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
+const SAMPLE_ZARR_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/sample.zarr");
+
 const SAMPLE_CHECKSUM: &str = "4313ab36412db2981c3ed391b38604d6-5--1516";
 
 enum Input {
@@ -48,23 +50,24 @@ impl TestCase {
 }
 
 fn sample1() -> TestCase {
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push("tests");
-    path.push("data");
-    path.push("sample.zarr");
     TestCase {
-        input: Input::Permanent(path),
+        input: Input::Permanent(SAMPLE_ZARR_PATH.into()),
         expected: Expected::Checksum(SAMPLE_CHECKSUM),
     }
 }
 
-fn sample2() -> TestCase {
+fn mksamplecopy() -> TempDir {
     let tmp_path = tempdir().unwrap();
     let opts = dir::CopyOptions {
         content_only: true,
         ..dir::CopyOptions::default()
     };
-    dir::copy(sample1().path(), tmp_path.path(), &opts).unwrap();
+    dir::copy(SAMPLE_ZARR_PATH, tmp_path.path(), &opts).unwrap();
+    tmp_path
+}
+
+fn sample2() -> TestCase {
+    let tmp_path = mksamplecopy();
     let mut path = PathBuf::from(tmp_path.path());
     path.push("arr_2");
     fs::create_dir_all(path).unwrap();
@@ -87,12 +90,7 @@ fn empty_dir() -> TestCase {
 
 #[cfg(unix)]
 fn unreadable_file() -> TestCase {
-    let tmp_path = tempdir().unwrap();
-    let opts = dir::CopyOptions {
-        content_only: true,
-        ..dir::CopyOptions::default()
-    };
-    dir::copy(sample1().path(), tmp_path.path(), &opts).unwrap();
+    let tmp_path = mksamplecopy();
     let mut path = PathBuf::from(tmp_path.path());
     path.push("arr_0");
     path.push("unreadable");
@@ -110,12 +108,7 @@ fn unreadable_file() -> TestCase {
 
 #[cfg(unix)]
 fn unreadable_dir() -> TestCase {
-    let tmp_path = tempdir().unwrap();
-    let opts = dir::CopyOptions {
-        content_only: true,
-        ..dir::CopyOptions::default()
-    };
-    dir::copy(sample1().path(), tmp_path.path(), &opts).unwrap();
+    let tmp_path = mksamplecopy();
     let mut path = PathBuf::from(tmp_path.path());
     path.push("arr_0");
     path.push("unreadable");
