@@ -116,10 +116,15 @@ fn unreadable_dir() -> TestCase {
     path.push("unreadable");
     fs::create_dir(&path).unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
-    let checker = move |e| match e {
-        WalkError::ReaddirError { path: epath, .. } => assert_eq!(path, epath),
-        WalkError::WalkdirError { .. } => (),
-        e => panic!("Got unexpected error: {e:?}"),
+    let checker = move |e| {
+        // Make the directory readable again so that the temp dir can be
+        // cleaned up:
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+        match e {
+            WalkError::ReaddirError { path: epath, .. } => assert_eq!(path, epath),
+            WalkError::WalkdirError { .. } => (),
+            e => panic!("Got unexpected error: {e:?}"),
+        }
     };
     TestCase {
         input: Input::Temporary(tmp_path),
