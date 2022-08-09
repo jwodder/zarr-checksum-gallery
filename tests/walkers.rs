@@ -4,13 +4,14 @@ use cfg_if::cfg_if;
 use fs_extra::dir;
 use rstest::rstest;
 use rstest_reuse::{apply, template};
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::{tempdir, NamedTempFile, TempDir};
 use zarr_checksum_gallery::*;
 
 #[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::{ffi::OsStrExt, fs::PermissionsExt};
 
 const SAMPLE_ZARR_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/sample.zarr");
 
@@ -51,11 +52,11 @@ impl TestCase {
     }
 }
 
-fn sample1() -> TestCase {
-    TestCase {
+fn sample1() -> Option<TestCase> {
+    Some(TestCase {
         input: Input::Permanent(SAMPLE_ZARR_PATH.into()),
         expected: Expected::Checksum(SAMPLE_CHECKSUM),
-    }
+    })
 }
 
 fn mksamplecopy() -> TempDir {
@@ -68,7 +69,7 @@ fn mksamplecopy() -> TempDir {
     tmp_path
 }
 
-fn sample2() -> TestCase {
+fn sample2() -> Option<TestCase> {
     let tmp_path = mksamplecopy();
     let mut path = PathBuf::from(tmp_path.path());
     path.push("arr_2");
@@ -77,21 +78,39 @@ fn sample2() -> TestCase {
     path.push("arr_3");
     path.push("foo");
     fs::create_dir_all(path).unwrap();
-    TestCase {
+    Some(TestCase {
         input: Input::Temporary(tmp_path),
         expected: Expected::Checksum(SAMPLE_CHECKSUM),
-    }
+    })
 }
 
-fn empty_dir() -> TestCase {
-    TestCase {
+fn empty_dir() -> Option<TestCase> {
+    Some(TestCase {
         input: Input::Temporary(tempdir().unwrap()),
         expected: Expected::Checksum("481a2f77ab786a0f45aafd5db0971caa-0--0"),
-    }
+    })
+}
+
+fn file_arg() -> Option<TestCase> {
+    let tmpfile = NamedTempFile::new().unwrap();
+    let path = tmpfile.path().to_path_buf();
+    let checker = move |e| match e {
+        ChecksumError::WalkError(WalkError::ReaddirError { path: epath, .. }) => {
+            assert_eq!(path, epath)
+        }
+        ChecksumError::WalkError(WalkError::NotDirRootError { path: epath }) => {
+            assert_eq!(path, epath)
+        }
+        e => panic!("Got unexpected error: {e:?}"),
+    };
+    Some(TestCase {
+        input: Input::TempFile(tmpfile),
+        expected: Expected::Error(Box::new(checker)),
+    })
 }
 
 #[cfg(unix)]
-fn unreadable_file() -> TestCase {
+fn unreadable_file() -> Option<TestCase> {
     let tmp_path = mksamplecopy();
     let mut path = PathBuf::from(tmp_path.path());
     path.push("arr_0");
@@ -104,14 +123,14 @@ fn unreadable_file() -> TestCase {
         }
         e => panic!("Got unexpected error: {e}"),
     };
-    TestCase {
+    Some(TestCase {
         input: Input::Temporary(tmp_path),
         expected: Expected::Error(Box::new(checker)),
-    }
+    })
 }
 
 #[cfg(unix)]
-fn unreadable_dir() -> TestCase {
+fn unreadable_dir() -> Option<TestCase> {
     let tmp_path = mksamplecopy();
     let mut path = PathBuf::from(tmp_path.path());
     path.push("arr_0");
@@ -130,28 +149,36 @@ fn unreadable_dir() -> TestCase {
             e => panic!("Got unexpected error: {e:?}"),
         }
     };
-    TestCase {
+    Some(TestCase {
         input: Input::Temporary(tmp_path),
         expected: Expected::Error(Box::new(checker)),
-    }
+    })
 }
 
-fn file_arg() -> TestCase {
-    let tmpfile = NamedTempFile::new().unwrap();
-    let path = tmpfile.path().to_path_buf();
+#[cfg(unix)]
+fn bad_filename() -> Option<TestCase> {
+    let tmp_path = mksamplecopy();
+    let badname = OsStr::from_bytes(b"f\xF6\xF6");
+    let mut relpath = PathBuf::new();
+    relpath.push("arr_0");
+    relpath.push(badname);
+    let path = tmp_path.path().join(&relpath);
+    if fs::write(path, "This is a file.\n").is_err() {
+        // Some Unix OS's and/or filesystems (Looking at you, Apple) don't
+        // allow non-UTF-8 pathnames at all.  Hence, we need to skip this test
+        // on such platforms.
+        return None;
+    }
     let checker = move |e| match e {
-        ChecksumError::WalkError(WalkError::ReaddirError { path: epath, .. }) => {
-            assert_eq!(path, epath)
-        }
-        ChecksumError::WalkError(WalkError::NotDirRootError { path: epath }) => {
-            assert_eq!(path, epath)
+        ChecksumError::WalkError(WalkError::PathDecodeError { path: epath }) => {
+            assert!(epath == badname || epath == relpath, "epath = {epath:?}");
         }
         e => panic!("Got unexpected error: {e:?}"),
     };
-    TestCase {
-        input: Input::TempFile(tmpfile),
+    Some(TestCase {
+        input: Input::Temporary(tmp_path),
         expected: Expected::Error(Box::new(checker)),
-    }
+    })
 }
 
 #[template]
@@ -168,6 +195,7 @@ cfg_if! {
         #[apply(base_cases)]
         #[case(unreadable_file())]
         #[case(unreadable_dir())]
+        #[case(bad_filename())]
         fn test_cases(#[case] case: TestCase) {}
     } else {
         #[template]
@@ -177,31 +205,41 @@ cfg_if! {
 }
 
 #[apply(test_cases)]
-fn test_walkdir_checksum(#[case] case: TestCase) {
-    let r = walkdir_checksum(case.path());
-    case.check(r);
+fn test_walkdir_checksum(#[case] case: Option<TestCase>) {
+    if let Some(case) = case {
+        let r = walkdir_checksum(case.path());
+        case.check(r);
+    }
 }
 
 #[apply(test_cases)]
-fn test_recursive_checksum(#[case] case: TestCase) {
-    let r = recursive_checksum(case.path());
-    case.check(r);
+fn test_recursive_checksum(#[case] case: Option<TestCase>) {
+    if let Some(case) = case {
+        let r = recursive_checksum(case.path());
+        case.check(r);
+    }
 }
 
 #[apply(test_cases)]
-fn test_breadth_first_checksum(#[case] case: TestCase) {
-    let r = breadth_first_checksum(case.path());
-    case.check(r);
+fn test_breadth_first_checksum(#[case] case: Option<TestCase>) {
+    if let Some(case) = case {
+        let r = breadth_first_checksum(case.path());
+        case.check(r);
+    }
 }
 
 #[apply(test_cases)]
-fn test_fastio_checksum(#[case] case: TestCase) {
-    let r = fastio_checksum(case.path(), num_cpus::get());
-    case.check(r);
+fn test_fastio_checksum(#[case] case: Option<TestCase>) {
+    if let Some(case) = case {
+        let r = fastio_checksum(case.path(), num_cpus::get());
+        case.check(r);
+    }
 }
 
 #[apply(test_cases)]
-fn test_depth_first_checksum(#[case] case: TestCase) {
-    let r = depth_first_checksum(case.path());
-    case.check(r);
+fn test_depth_first_checksum(#[case] case: Option<TestCase>) {
+    if let Some(case) = case {
+        let r = depth_first_checksum(case.path());
+        case.check(r);
+    }
 }
