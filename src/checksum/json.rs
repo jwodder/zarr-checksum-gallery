@@ -8,7 +8,7 @@ pub(super) fn get_checksum_json(
 ) -> String {
     let mut filevec = Vec::new();
     for (name, checksum) in files {
-        filevec.push(ZarrJSONChecksum {
+        filevec.push(ChecksumEntry {
             name,
             digest: checksum.checksum,
             size: checksum.size,
@@ -18,7 +18,7 @@ pub(super) fn get_checksum_json(
     let mut dirvec = Vec::new();
     for (name, checksum) in directories {
         if checksum.file_count > 0 {
-            dirvec.push(ZarrJSONChecksum {
+            dirvec.push(ChecksumEntry {
                 name,
                 digest: checksum.checksum,
                 size: checksum.size,
@@ -26,7 +26,7 @@ pub(super) fn get_checksum_json(
         }
     }
     dirvec.sort();
-    let collection = ZarrJSONChecksumCollection {
+    let collection = ChecksumCollection {
         directories: dirvec,
         files: filevec,
     };
@@ -36,13 +36,13 @@ pub(super) fn get_checksum_json(
 }
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-struct ZarrJSONChecksum {
+struct ChecksumEntry {
     name: String,
     digest: String,
     size: u64,
 }
 
-impl ZarrJSONChecksum {
+impl ChecksumEntry {
     fn write_json<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_str(r#"{"digest":"#)?;
         write_json_str(&self.digest, writer)?;
@@ -54,12 +54,12 @@ impl ZarrJSONChecksum {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-struct ZarrJSONChecksumCollection {
-    directories: Vec<ZarrJSONChecksum>,
-    files: Vec<ZarrJSONChecksum>,
+struct ChecksumCollection {
+    directories: Vec<ChecksumEntry>,
+    files: Vec<ChecksumEntry>,
 }
 
-impl ZarrJSONChecksumCollection {
+impl ChecksumCollection {
     fn write_json<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_str(r#"{"directories":["#)?;
         for (i, d) in self.directories.iter().enumerate() {
