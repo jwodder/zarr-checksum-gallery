@@ -24,6 +24,7 @@ enum Input {
     Permanent(PathBuf),
     Temporary(TempDir),
     TempFile(NamedTempFile),
+    SubTemporary(TempDir, PathBuf),
 }
 
 enum Expected {
@@ -42,6 +43,7 @@ impl TestCase {
             Input::Permanent(path) => path,
             Input::Temporary(dir) => dir.path(),
             Input::TempFile(f) => f.path(),
+            Input::SubTemporary(_, path) => path,
         }
     }
 
@@ -211,6 +213,27 @@ fn bad_dirname() -> Option<TestCase> {
     })
 }
 
+#[cfg(unix)]
+fn bad_basedir() -> Option<TestCase> {
+    let badname = OsStr::from_bytes(b"f\xF6\xF6");
+    let tmp_path = tempdir().unwrap();
+    let opts = dir::CopyOptions {
+        content_only: true,
+        ..dir::CopyOptions::default()
+    };
+    let path = tmp_path.path().join(badname);
+    if dir::copy(SAMPLE_ZARR_PATH, &path, &opts).is_err() {
+        // Some Unix OS's and/or filesystems (Looking at you, Apple) don't
+        // allow non-UTF-8 pathnames at all.  Hence, we need to skip this test
+        // on such platforms.
+        return None;
+    }
+    Some(TestCase {
+        input: Input::SubTemporary(tmp_path, path),
+        expected: Expected::Checksum(SAMPLE_CHECKSUM),
+    })
+}
+
 #[template]
 #[rstest]
 #[case(sample1())]
@@ -227,6 +250,7 @@ cfg_if! {
         #[case(unreadable_dir())]
         #[case(bad_filename())]
         #[case(bad_dirname())]
+        #[case(bad_basedir())]
         fn test_cases(#[case] case: TestCase) {}
     } else {
         #[template]
