@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 pub struct ZarrChecksum {
     pub checksum: String,
     pub size: u64,
-    pub file_count: usize,
+    pub file_count: u64,
 }
 
 impl fmt::Display for ZarrChecksum {
