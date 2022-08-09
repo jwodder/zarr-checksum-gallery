@@ -6,25 +6,24 @@ pub(super) fn get_checksum_json(
     files: HashMap<String, ZarrChecksum>,
     directories: HashMap<String, ZarrChecksum>,
 ) -> String {
-    let mut filevec = Vec::new();
-    for (name, checksum) in files {
-        filevec.push(ChecksumEntry {
+    let mut filevec = files
+        .into_iter()
+        .map(|(name, checksum)| ChecksumEntry {
             name,
             digest: checksum.checksum,
             size: checksum.size,
-        });
-    }
+        })
+        .collect::<Vec<_>>();
     filevec.sort();
-    let mut dirvec = Vec::new();
-    for (name, checksum) in directories {
-        if checksum.file_count > 0 {
-            dirvec.push(ChecksumEntry {
-                name,
-                digest: checksum.checksum,
-                size: checksum.size,
-            });
-        }
-    }
+    let mut dirvec = directories
+        .into_iter()
+        .filter(|(_, checksum)| checksum.file_count > 0)
+        .map(|(name, checksum)| ChecksumEntry {
+            name,
+            digest: checksum.checksum,
+            size: checksum.size,
+        })
+        .collect::<Vec<_>>();
     dirvec.sort();
     let collection = ChecksumCollection {
         directories: dirvec,
