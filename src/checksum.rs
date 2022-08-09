@@ -3,7 +3,7 @@ use crate::errors::{ChecksumError, ChecksumTreeError, WalkError};
 use json::get_checksum_json;
 use md5::{Digest, Md5};
 use relative_path::{Component, RelativePathBuf};
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 use std::fmt;
 use std::fs;
 use std::io;
@@ -116,9 +116,13 @@ impl ChecksumTree {
                     size,
                     file_count: 1,
                 });
-                // TODO: Prevent the double-add from happening
-                if d.insert(basename, entry).is_some() {
-                    return Err(ChecksumTreeError::DoubleAdd { path: relpath });
+                match d.entry(basename) {
+                    Entry::Occupied(_) => {
+                        return Err(ChecksumTreeError::DoubleAdd { path: relpath })
+                    }
+                    Entry::Vacant(v) => {
+                        v.insert(entry);
+                    }
                 }
                 Ok(())
             }
