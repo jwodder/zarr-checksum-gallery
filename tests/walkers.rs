@@ -4,14 +4,17 @@ use cfg_if::cfg_if;
 use fs_extra::dir;
 use rstest::rstest;
 use rstest_reuse::{apply, template};
-use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::{tempdir, NamedTempFile, TempDir};
 use zarr_checksum_gallery::*;
 
-#[cfg(unix)]
-use std::os::unix::{ffi::OsStrExt, fs::PermissionsExt};
+cfg_if! {
+    if #[cfg(unix)] {
+        use std::ffi::OsStr;
+        use std::os::unix::{ffi::OsStrExt, fs::PermissionsExt};
+    }
+}
 
 const SAMPLE_ZARR_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/sample.zarr");
 
@@ -181,6 +184,33 @@ fn bad_filename() -> Option<TestCase> {
     })
 }
 
+#[cfg(unix)]
+fn bad_dirname() -> Option<TestCase> {
+    let tmp_path = mksamplecopy();
+    let badname = OsStr::from_bytes(b"f\xF6\xF6");
+    let mut relpath = PathBuf::new();
+    relpath.push("arr_0");
+    relpath.push(badname);
+    if fs::create_dir(tmp_path.path().join(&relpath)).is_err() {
+        // Some Unix OS's and/or filesystems (Looking at you, Apple) don't
+        // allow non-UTF-8 pathnames at all.  Hence, we need to skip this test
+        // on such platforms.
+        return None;
+    }
+    relpath.push("somefile");
+    fs::write(tmp_path.path().join(&relpath), "This is a file.\n").unwrap();
+    let checker = move |e| match e {
+        ChecksumError::WalkError(WalkError::PathDecodeError { path: epath }) => {
+            assert!(epath == badname || epath == relpath, "epath = {epath:?}");
+        }
+        e => panic!("Got unexpected error: {e:?}"),
+    };
+    Some(TestCase {
+        input: Input::Temporary(tmp_path),
+        expected: Expected::Error(Box::new(checker)),
+    })
+}
+
 #[template]
 #[rstest]
 #[case(sample1())]
@@ -196,6 +226,7 @@ cfg_if! {
         #[case(unreadable_file())]
         #[case(unreadable_dir())]
         #[case(bad_filename())]
+        #[case(bad_dirname())]
         fn test_cases(#[case] case: TestCase) {}
     } else {
         #[template]
