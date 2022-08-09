@@ -16,6 +16,7 @@ hex = "0.4.3"
 log = "0.4.17"
 md-5 = "0.10.1"
 num_cpus = "1.13.1"
+relative-path = "1.7.2"
 thiserror = "1.0.32"
 walkdir = "2.3.2"
 

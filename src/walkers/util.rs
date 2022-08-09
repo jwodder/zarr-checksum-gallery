@@ -26,5 +26,7 @@ pub(crate) fn listdir<P: AsRef<Path>>(dirpath: P) -> Result<Vec<DirEntry>, WalkE
 }
 
 pub(crate) fn decode_filename(name: OsString) -> Result<String, WalkError> {
-    name.into_string().map_err(WalkError::filename_decode_error)
+    // TODO: Should the path to the containing directory be included in the
+    // error?
+    name.into_string().map_err(WalkError::path_decode_error)
 }

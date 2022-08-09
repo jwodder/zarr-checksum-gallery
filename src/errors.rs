@@ -1,4 +1,4 @@
-use std::ffi::OsString;
+use relative_path::RelativePathBuf;
 use std::io;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -24,9 +24,8 @@ pub enum WalkError {
         source: WDError,
     },
 
-    #[error("Could not decode filename {filename:?}")]
-    // TODO: Should this include the path of the containing directory?
-    FilenameDecodeError { filename: OsString },
+    #[error("Could not decode path or path component {path:?}")]
+    PathDecodeError { path: PathBuf },
 
     #[error("Root path of traversal is not a directory: {}", .path.display())]
     NotDirRootError { path: PathBuf },
@@ -65,8 +64,10 @@ impl WalkError {
         e.into()
     }
 
-    pub fn filename_decode_error(filename: OsString) -> Self {
-        WalkError::FilenameDecodeError { filename }
+    pub fn path_decode_error<P: AsRef<Path>>(path: P) -> Self {
+        WalkError::PathDecodeError {
+            path: path.as_ref().into(),
+        }
     }
 
     pub fn not_dir_root_error<P: AsRef<Path>>(path: P) -> Self {
@@ -78,43 +79,14 @@ impl WalkError {
 
 #[derive(Debug, Error)]
 pub enum ChecksumTreeError {
-    #[error("Could not decode path {path:?}")]
-    PathDecodeError { path: PathBuf },
-
     #[error("Invalid relative path {path:?}")]
-    InvalidPath { path: PathBuf },
+    InvalidPath { path: RelativePathBuf },
 
     #[error("Path type conflict error for {path:?}")]
-    PathTypeConflict { path: PathBuf },
+    PathTypeConflict { path: RelativePathBuf },
 
     #[error("File {path:?} added to checksum tree twice")]
-    DoubleAdd { path: PathBuf },
-}
-
-impl ChecksumTreeError {
-    pub fn path_decode_error<P: AsRef<Path>>(path: P) -> Self {
-        ChecksumTreeError::PathDecodeError {
-            path: path.as_ref().into(),
-        }
-    }
-
-    pub fn invalid_path<P: AsRef<Path>>(path: P) -> Self {
-        ChecksumTreeError::InvalidPath {
-            path: path.as_ref().into(),
-        }
-    }
-
-    pub fn path_type_conflict<P: AsRef<Path>>(path: P) -> Self {
-        ChecksumTreeError::PathTypeConflict {
-            path: path.as_ref().into(),
-        }
-    }
-
-    pub fn double_add<P: AsRef<Path>>(path: P) -> Self {
-        ChecksumTreeError::DoubleAdd {
-            path: path.as_ref().into(),
-        }
-    }
+    DoubleAdd { path: RelativePathBuf },
 }
 
 #[derive(Debug, Error)]

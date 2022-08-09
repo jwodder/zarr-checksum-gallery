@@ -2,12 +2,13 @@ mod json;
 use crate::errors::{ChecksumError, ChecksumTreeError, WalkError};
 use json::get_checksum_json;
 use md5::{Digest, Md5};
+use relative_path::{Component, RelativePathBuf};
 use std::collections::HashMap;
 use std::fmt;
 use std::fs;
 use std::io;
 use std::iter::Iterator;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ZarrChecksum {
@@ -74,34 +75,30 @@ impl ChecksumTree {
         }
     }
 
-    pub fn add_file<P: AsRef<Path>>(
+    pub fn add_file(
         &mut self,
-        relpath: P,
+        relpath: RelativePathBuf,
         checksum: &str,
         size: u64,
     ) -> Result<(), ChecksumTreeError> {
-        let relpath = relpath.as_ref();
         match self {
-            ChecksumTree::File { .. } => Err(ChecksumTreeError::path_type_conflict("<root>")),
+            ChecksumTree::File { .. } => Err(ChecksumTreeError::PathTypeConflict {
+                path: RelativePathBuf::from("<root>"),
+            }),
             ChecksumTree::Directory { children, .. } => {
                 let mut parts = Vec::new();
                 for p in relpath.components() {
                     match p {
-                        Component::Normal(s) => match s.to_str() {
-                            Some(name) => parts.push(name.to_string()),
-                            // TODO: Replace `P` with a relative_path type so
-                            // that this is caught earlier:
-                            None => return Err(ChecksumTreeError::path_decode_error(relpath)),
-                        },
-                        _ => return Err(ChecksumTreeError::invalid_path(relpath)),
+                        Component::Normal(name) => parts.push(name.to_string()),
+                        _ => return Err(ChecksumTreeError::InvalidPath { path: relpath }),
                     }
                 }
                 let basename = match parts.pop() {
                     Some(s) => s,
-                    None => return Err(ChecksumTreeError::invalid_path(relpath)),
+                    None => return Err(ChecksumTreeError::InvalidPath { path: relpath }),
                 };
                 let mut d = children;
-                let mut dpath = PathBuf::new();
+                let mut dpath = RelativePathBuf::new();
                 for dirname in parts {
                     dpath.push(&dirname);
                     match d
@@ -109,7 +106,7 @@ impl ChecksumTree {
                         .or_insert_with(ChecksumTree::directory)
                     {
                         ChecksumTree::File { .. } => {
-                            return Err(ChecksumTreeError::path_type_conflict(dpath))
+                            return Err(ChecksumTreeError::PathTypeConflict { path: dpath })
                         }
                         ChecksumTree::Directory { children, .. } => d = children,
                     }
@@ -121,7 +118,7 @@ impl ChecksumTree {
                 });
                 // TODO: Prevent the double-add from happening
                 if d.insert(basename, entry).is_some() {
-                    return Err(ChecksumTreeError::double_add(relpath));
+                    return Err(ChecksumTreeError::DoubleAdd { path: relpath });
                 }
                 Ok(())
             }
@@ -151,7 +148,7 @@ impl Default for ChecksumTree {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct FileInfo {
-    pub relpath: PathBuf,
+    pub relpath: RelativePathBuf,
     pub md5_digest: String,
     pub size: u64,
 }
@@ -166,13 +163,15 @@ impl FileInfo {
         let basepath = basepath.as_ref();
         let relpath = path
             .strip_prefix(PathBuf::from(basepath))
-            .map_err(|_| WalkError::strip_prefix_error(&path, &basepath))?
-            .to_path_buf();
+            .map_err(|_| WalkError::strip_prefix_error(&path, &basepath))?;
         if relpath == Path::new("") {
             return Err(WalkError::strip_prefix_error(path, basepath));
         }
+        // Should we assert that this only ever fails with kind NonUtf8?
+        let utf8relpath = RelativePathBuf::from_path(relpath)
+            .map_err(|_| WalkError::path_decode_error(&relpath))?;
         Ok(FileInfo {
-            relpath,
+            relpath: utf8relpath,
             md5_digest: md5_file(&path)?,
             size: fs::metadata(&path)
                 .map_err(|e| WalkError::stat_error(&path, e))?
@@ -356,19 +355,39 @@ mod test {
     fn test_checksum_tree() {
         let mut sample = ChecksumTree::directory();
         sample
-            .add_file("arr_0/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315)
+            .add_file(
+                RelativePathBuf::from("arr_0/.zarray"),
+                "9e30a0a1a465e24220d4132fdd544634",
+                315,
+            )
             .unwrap();
         sample
-            .add_file("arr_0/0", "ed4e934a474f1d2096846c6248f18c00", 431)
+            .add_file(
+                RelativePathBuf::from("arr_0/0"),
+                "ed4e934a474f1d2096846c6248f18c00",
+                431,
+            )
             .unwrap();
         sample
-            .add_file("arr_1/.zarray", "9e30a0a1a465e24220d4132fdd544634", 315)
+            .add_file(
+                RelativePathBuf::from("arr_1/.zarray"),
+                "9e30a0a1a465e24220d4132fdd544634",
+                315,
+            )
             .unwrap();
         sample
-            .add_file("arr_1/0", "fba4dee03a51bde314e9713b00284a93", 431)
+            .add_file(
+                RelativePathBuf::from("arr_1/0"),
+                "fba4dee03a51bde314e9713b00284a93",
+                431,
+            )
             .unwrap();
         sample
-            .add_file(".zgroup", "e20297935e73dd0154104d4ea53040ab", 24)
+            .add_file(
+                RelativePathBuf::from(".zgroup"),
+                "e20297935e73dd0154104d4ea53040ab",
+                24,
+            )
             .unwrap();
         assert_eq!(
             sample.checksum().checksum,

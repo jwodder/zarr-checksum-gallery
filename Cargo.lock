@@ -265,6 +265,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "relative-path"
+version = "1.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0df32d82cedd1499386877b062ebe8721f806de80b08d183c70184ef17dd1d42"
+
+[[package]]
 name = "remove_dir_all"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -473,6 +479,7 @@ dependencies = [
  "log",
  "md-5",
  "num_cpus",
+ "relative-path",
  "rstest",
  "rstest_reuse",
  "tempfile",
