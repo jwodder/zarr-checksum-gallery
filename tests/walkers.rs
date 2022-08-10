@@ -190,20 +190,21 @@ fn bad_filename() -> Option<TestCase> {
 fn bad_dirname() -> Option<TestCase> {
     let tmp_path = mksamplecopy();
     let badname = OsStr::from_bytes(b"f\xF6\xF6");
-    let mut relpath = PathBuf::new();
-    relpath.push("arr_0");
-    relpath.push(badname);
-    if fs::create_dir(tmp_path.path().join(&relpath)).is_err() {
+    let badpath = Path::new("arr_0").join(badname);
+    if fs::create_dir(tmp_path.path().join(&badpath)).is_err() {
         // Some Unix OS's and/or filesystems (Looking at you, Apple) don't
         // allow non-UTF-8 pathnames at all.  Hence, we need to skip this test
         // on such platforms.
         return None;
     }
-    relpath.push("somefile");
+    let relpath = badpath.join("somefile");
     fs::write(tmp_path.path().join(&relpath), "This is a file.\n").unwrap();
     let checker = move |e| match e {
         ChecksumError::FSError(FSError::PathDecodeError { path: epath }) => {
-            assert!(epath == badname || epath == relpath, "epath = {epath:?}");
+            assert!(
+                epath == badname || epath == badpath || epath == relpath,
+                "epath = {epath:?}"
+            );
         }
         e => panic!("Got unexpected error: {e:?}"),
     };
