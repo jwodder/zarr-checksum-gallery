@@ -22,7 +22,7 @@ pub fn walkdir_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumEr
             // We also can't use r.map() inside the filter(), as that takes
             // ownership of r.
             .filter(|r| match r {
-                Ok(e) => e.file_type().is_file(),
+                Ok(e) => !e.file_type().is_dir(),
                 Err(_) => true,
             })
             .map(|r| {

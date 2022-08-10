@@ -12,7 +12,10 @@ use zarr_checksum_gallery::*;
 cfg_if! {
     if #[cfg(unix)] {
         use std::ffi::OsStr;
-        use std::os::unix::{ffi::OsStrExt, fs::PermissionsExt};
+        use std::os::unix::ffi::OsStrExt;
+        use std::os::unix::fs::{PermissionsExt,symlink};
+    } else if #[cfg(windows)] {
+        use std::os::windows::fs::symlink_file;
     }
 }
 
@@ -111,6 +114,34 @@ fn file_arg() -> Option<TestCase> {
     Some(TestCase {
         input: Input::TempFile(tmpfile),
         expected: Expected::Error(Box::new(checker)),
+    })
+}
+
+fn file_symlink() -> Option<TestCase> {
+    let tmp_path = tempdir().unwrap();
+    let opts = dir::CopyOptions {
+        content_only: true,
+        ..dir::CopyOptions::default()
+    };
+    let path = tmp_path.path().join("sample.zarr");
+    dir::copy(SAMPLE_ZARR_PATH, &path, &opts).unwrap();
+    let linkpath = path.join("arr_0").join("0");
+    fs::rename(&linkpath, tmp_path.path().join("0")).unwrap();
+    cfg_if! {
+        if #[cfg(unix)] {
+            symlink(Path::new("../../0"), linkpath).unwrap()
+        } else if #[cfg(windows)] {
+            if symlink_file(Path::new("..\\..\\0"), linkpath).is_err() {
+                // Assume symlinks aren't enabled for us and skip the test
+                return None;
+            }
+        } else {
+            return None;
+        }
+    }
+    Some(TestCase {
+        input: Input::SubTemporary(tmp_path, path),
+        expected: Expected::Checksum(SAMPLE_CHECKSUM),
     })
 }
 
@@ -235,6 +266,7 @@ fn bad_basedir() -> Option<TestCase> {
 #[case(sample2())]
 #[case(empty_dir())]
 #[case(file_arg())]
+#[case(file_symlink())]
 fn base_cases(#[case] case: TestCase) {}
 
 cfg_if! {
