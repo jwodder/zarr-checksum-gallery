@@ -354,3 +354,12 @@ fn test_depth_first_checksum(#[case] case: Option<TestCase>) {
         case.check(r);
     }
 }
+
+#[apply(test_cases)]
+#[tokio::test]
+async fn test_fastasync_checksum(#[case] case: Option<TestCase>) {
+    if let Some(case) = case {
+        let r = fastasync_checksum(case.path(), num_cpus::get()).await;
+        case.check(r);
+    }
+}
