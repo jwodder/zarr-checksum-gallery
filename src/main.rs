@@ -18,21 +18,26 @@ struct Arguments {
 
 #[derive(Clone, Debug, Eq, PartialEq, Subcommand)]
 enum Command {
-    Walkdir {
-        dirpath: PathBuf,
-    },
-    Recursive {
-        dirpath: PathBuf,
-    },
     BreadthFirst {
         dirpath: PathBuf,
     },
     DepthFirst {
         dirpath: PathBuf,
     },
+    Fastasync {
+        #[clap(short, long, default_value_t = num_cpus::get())]
+        workers: usize,
+        dirpath: PathBuf,
+    },
     Fastio {
         #[clap(short, long, default_value_t = num_cpus::get())]
         threads: usize,
+        dirpath: PathBuf,
+    },
+    Recursive {
+        dirpath: PathBuf,
+    },
+    Walkdir {
         dirpath: PathBuf,
     },
 }
@@ -42,6 +47,11 @@ impl Command {
         match self {
             Command::BreadthFirst { dirpath } => breadth_first_checksum(dirpath),
             Command::DepthFirst { dirpath } => depth_first_checksum(dirpath),
+            Command::Fastasync { workers, dirpath } => tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(fastasync_checksum(dirpath, workers)),
             Command::Fastio { threads, dirpath } => fastio_checksum(dirpath, threads),
             Command::Recursive { dirpath } => recursive_checksum(dirpath),
             Command::Walkdir { dirpath } => walkdir_checksum(dirpath),

@@ -59,6 +59,14 @@ Implementations
 - `depth-first` — Walk the directory tree iteratively & depth-first, computing
   the checksum for each directory as soon as possible
 
+- `fastasync` — Walk the directory tree using multiple asynchronous worker
+  tasks, building a tree of file checksums in memory
+
+  **Options:**
+
+    - `-w <NUM>`/`--workers <NUM>` — Set the number of worker tasks to use.
+      The default value is the number of logical CPU cores on the machine.
+
 - `fastio` — Walk the directory tree using multiple threads, building a tree of
   file checksums in memory
 
