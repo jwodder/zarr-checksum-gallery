@@ -1,7 +1,6 @@
 use crate::checksum::nodes::*;
 use crate::errors::{ChecksumError, FSError};
-use crate::util::relative_to;
-use relative_path::RelativePathBuf;
+use crate::zarr::{relative_to, EntryPath};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -12,7 +11,7 @@ struct OpenDir {
 }
 
 impl OpenDir {
-    fn new<P: AsRef<Path>>(dirpath: P, relpath: RelativePathBuf) -> Result<OpenDir, FSError> {
+    fn new<P: AsRef<Path>>(dirpath: P, relpath: EntryPath) -> Result<OpenDir, FSError> {
         let handle = fs::read_dir(&dirpath).map_err(|e| FSError::readdir_error(&dirpath, e))?;
         Ok(OpenDir {
             handle,
@@ -23,12 +22,12 @@ impl OpenDir {
 }
 
 struct ZarrDirectory {
-    relpath: RelativePathBuf,
+    relpath: EntryPath,
     nodes: Vec<ZarrChecksumNode>,
 }
 
 impl ZarrDirectory {
-    fn new(relpath: RelativePathBuf) -> ZarrDirectory {
+    fn new(relpath: EntryPath) -> ZarrDirectory {
         ZarrDirectory {
             relpath,
             nodes: Vec::new(),
@@ -50,7 +49,7 @@ impl ZarrDirectory {
 
 pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumError> {
     let dirpath = PathBuf::from(dirpath.as_ref());
-    let mut dirstack = vec![OpenDir::new(&dirpath, "<root>".into())?];
+    let mut dirstack = vec![OpenDir::new(&dirpath, "<root>".try_into().unwrap())?];
     loop {
         let topdir = dirstack.last_mut().unwrap();
         match topdir.handle.next() {

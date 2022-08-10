@@ -135,18 +135,18 @@ mod test {
     fn test_get_checksum_json() {
         let files = vec![
             FileChecksumNode {
-                relpath: "foo".into(),
+                relpath: "foo".try_into().unwrap(),
                 checksum: "0123456789abcdef0123456789abcdef".into(),
                 size: 69105,
             },
             FileChecksumNode {
-                relpath: "bar".into(),
+                relpath: "bar".try_into().unwrap(),
                 checksum: "abcdef0123456789abcdef0123456789".into(),
                 size: 42,
             },
         ];
         let directories = Vec::from([DirChecksumNode {
-            relpath: "quux".into(),
+            relpath: "quux".try_into().unwrap(),
             checksum: "0987654321fedcba0987654321fedcba-23--65537".into(),
             size: 65537,
             file_count: 23,
@@ -162,7 +162,7 @@ mod test {
     fn test_get_checksum_json_empty_dir() {
         let files = Vec::new();
         let directories = vec![DirChecksumNode {
-            relpath: "quux".into(),
+            relpath: "quux".try_into().unwrap(),
             checksum: "481a2f77ab786a0f45aafd5db0971caa-0--0".into(),
             size: 0,
             file_count: 0,

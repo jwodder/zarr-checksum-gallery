@@ -1,4 +1,4 @@
-use relative_path::RelativePathBuf;
+use crate::zarr::EntryPath;
 use std::io;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -9,8 +9,8 @@ pub enum FSError {
     #[error("Error digesting file: {}: {source}", .path.display())]
     MD5FileError { path: PathBuf, source: io::Error },
 
-    #[error("Path {path:?} is not a normalized descendant of {basepath:?}")]
-    StripPrefixError { path: PathBuf, basepath: PathBuf },
+    #[error("Path {path:?} is not a normalized & decodable descendant of {basepath:?}")]
+    RelativePathError { path: PathBuf, basepath: PathBuf },
 
     #[error("Error stat'ing file: {}: {source}", .path.display())]
     StatError { path: PathBuf, source: io::Error },
@@ -24,9 +24,6 @@ pub enum FSError {
         source: WDError,
     },
 
-    #[error("Could not decode path or path component {path:?}")]
-    PathDecodeError { path: PathBuf },
-
     #[error("Root path of traversal is not a directory: {}", .path.display())]
     NotDirRootError { path: PathBuf },
 }
@@ -39,8 +36,8 @@ impl FSError {
         }
     }
 
-    pub fn strip_prefix_error<P: AsRef<Path>>(path: P, basepath: P) -> Self {
-        FSError::StripPrefixError {
+    pub fn relative_path_error<P: AsRef<Path>>(path: P, basepath: P) -> Self {
+        FSError::RelativePathError {
             path: path.as_ref().into(),
             basepath: basepath.as_ref().into(),
         }
@@ -64,12 +61,6 @@ impl FSError {
         e.into()
     }
 
-    pub fn path_decode_error<P: AsRef<Path>>(path: P) -> Self {
-        FSError::PathDecodeError {
-            path: path.as_ref().into(),
-        }
-    }
-
     pub fn not_dir_root_error<P: AsRef<Path>>(path: P) -> Self {
         FSError::NotDirRootError {
             path: path.as_ref().into(),
@@ -79,14 +70,11 @@ impl FSError {
 
 #[derive(Debug, Error)]
 pub enum ChecksumTreeError {
-    #[error("Invalid relative path {path:?}")]
-    InvalidPath { path: RelativePathBuf },
-
     #[error("Path type conflict error for {path:?}")]
-    PathTypeConflict { path: RelativePathBuf },
+    PathTypeConflict { path: EntryPath },
 
     #[error("File {path:?} added to checksum tree twice")]
-    DoubleAdd { path: RelativePathBuf },
+    DoubleAdd { path: EntryPath },
 }
 
 #[derive(Debug, Error)]
@@ -96,3 +84,7 @@ pub enum ChecksumError {
     #[error(transparent)]
     FSError(#[from] FSError),
 }
+
+#[derive(Debug, Error)]
+#[error("Invalid, unnormalized, or undecodable relative path: {0:?}")]
+pub struct EntryPathError(pub PathBuf);

@@ -164,19 +164,16 @@ fn unreadable_dir() -> Option<TestCase> {
 fn bad_filename() -> Option<TestCase> {
     let tmp_path = mksamplecopy();
     let badname = OsStr::from_bytes(b"f\xF6\xF6");
-    let mut relpath = PathBuf::new();
-    relpath.push("arr_0");
-    relpath.push(badname);
-    let path = tmp_path.path().join(&relpath);
-    if fs::write(path, "This is a file.\n").is_err() {
+    let path = tmp_path.path().join("arr_0").join(badname);
+    if fs::write(&path, "This is a file.\n").is_err() {
         // Some Unix OS's and/or filesystems (Looking at you, Apple) don't
         // allow non-UTF-8 pathnames at all.  Hence, we need to skip this test
         // on such platforms.
         return None;
     }
     let checker = move |e| match e {
-        ChecksumError::FSError(FSError::PathDecodeError { path: epath }) => {
-            assert!(epath == badname || epath == relpath, "epath = {epath:?}");
+        ChecksumError::FSError(FSError::RelativePathError { path: epath, .. }) => {
+            assert!(epath == path, "epath = {epath:?}");
         }
         e => panic!("Got unexpected error: {e:?}"),
     };
@@ -190,21 +187,18 @@ fn bad_filename() -> Option<TestCase> {
 fn bad_dirname() -> Option<TestCase> {
     let tmp_path = mksamplecopy();
     let badname = OsStr::from_bytes(b"f\xF6\xF6");
-    let badpath = Path::new("arr_0").join(badname);
-    if fs::create_dir(tmp_path.path().join(&badpath)).is_err() {
+    let badpath = tmp_path.path().join("arr_0").join(badname);
+    if fs::create_dir(&badpath).is_err() {
         // Some Unix OS's and/or filesystems (Looking at you, Apple) don't
         // allow non-UTF-8 pathnames at all.  Hence, we need to skip this test
         // on such platforms.
         return None;
     }
-    let relpath = badpath.join("somefile");
-    fs::write(tmp_path.path().join(&relpath), "This is a file.\n").unwrap();
+    let subpath = badpath.join("somefile");
+    fs::write(&subpath, "This is a file.\n").unwrap();
     let checker = move |e| match e {
-        ChecksumError::FSError(FSError::PathDecodeError { path: epath }) => {
-            assert!(
-                epath == badname || epath == badpath || epath == relpath,
-                "epath = {epath:?}"
-            );
+        ChecksumError::FSError(FSError::RelativePathError { path: epath, .. }) => {
+            assert!(epath == badpath || epath == subpath, "epath = {epath:?}");
         }
         e => panic!("Got unexpected error: {e:?}"),
     };
