@@ -55,10 +55,12 @@ pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, Checks
         match topdir.handle.next() {
             Some(Ok(p)) => {
                 let path = p.path();
-                let is_dir = p
-                    .file_type()
-                    .map_err(|e| FSError::stat_error(&p.path(), e))?
-                    .is_dir();
+                let ftype = p.file_type().map_err(|e| FSError::stat_error(&path, e))?;
+                let is_dir = ftype.is_dir()
+                    || (ftype.is_symlink()
+                        && fs::metadata(&path)
+                            .map_err(|e| FSError::stat_error(&path, e))?
+                            .is_dir());
                 if is_dir {
                     let relpath = relative_to(&path, &dirpath)?;
                     dirstack.push(OpenDir::new(path, relpath)?);
