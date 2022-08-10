@@ -100,10 +100,10 @@ fn file_arg() -> Option<TestCase> {
     let tmpfile = NamedTempFile::new().unwrap();
     let path = tmpfile.path().to_path_buf();
     let checker = move |e| match e {
-        ChecksumError::WalkError(WalkError::ReaddirError { path: epath, .. }) => {
+        ChecksumError::FSError(FSError::ReaddirError { path: epath, .. }) => {
             assert_eq!(path, epath)
         }
-        ChecksumError::WalkError(WalkError::NotDirRootError { path: epath }) => {
+        ChecksumError::FSError(FSError::NotDirRootError { path: epath }) => {
             assert_eq!(path, epath)
         }
         e => panic!("Got unexpected error: {e:?}"),
@@ -123,7 +123,7 @@ fn unreadable_file() -> Option<TestCase> {
     fs::write(&path, "You will never see this.\n").unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
     let checker = move |e| match e {
-        ChecksumError::WalkError(WalkError::MD5FileError { path: epath, .. }) => {
+        ChecksumError::FSError(FSError::MD5FileError { path: epath, .. }) => {
             assert_eq!(path, epath)
         }
         e => panic!("Got unexpected error: {e}"),
@@ -147,10 +147,10 @@ fn unreadable_dir() -> Option<TestCase> {
         // cleaned up:
         fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
         match e {
-            ChecksumError::WalkError(WalkError::ReaddirError { path: epath, .. }) => {
+            ChecksumError::FSError(FSError::ReaddirError { path: epath, .. }) => {
                 assert_eq!(path, epath)
             }
-            ChecksumError::WalkError(WalkError::WalkdirError { .. }) => (),
+            ChecksumError::FSError(FSError::WalkdirError { .. }) => (),
             e => panic!("Got unexpected error: {e:?}"),
         }
     };
@@ -175,7 +175,7 @@ fn bad_filename() -> Option<TestCase> {
         return None;
     }
     let checker = move |e| match e {
-        ChecksumError::WalkError(WalkError::PathDecodeError { path: epath }) => {
+        ChecksumError::FSError(FSError::PathDecodeError { path: epath }) => {
             assert!(epath == badname || epath == relpath, "epath = {epath:?}");
         }
         e => panic!("Got unexpected error: {e:?}"),
@@ -202,7 +202,7 @@ fn bad_dirname() -> Option<TestCase> {
     relpath.push("somefile");
     fs::write(tmp_path.path().join(&relpath), "This is a file.\n").unwrap();
     let checker = move |e| match e {
-        ChecksumError::WalkError(WalkError::PathDecodeError { path: epath }) => {
+        ChecksumError::FSError(FSError::PathDecodeError { path: epath }) => {
             assert!(epath == badname || epath == relpath, "epath = {epath:?}");
         }
         e => panic!("Got unexpected error: {e:?}"),

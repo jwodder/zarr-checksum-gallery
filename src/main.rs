@@ -67,7 +67,7 @@ fn main() -> ExitCode {
             eprintln!("INTERNAL ERROR: {e}");
             ExitCode::FAILURE
         }
-        Err(ChecksumError::WalkError(e)) => {
+        Err(ChecksumError::FSError(e)) => {
             eprintln!("{e}");
             ExitCode::FAILURE
         }

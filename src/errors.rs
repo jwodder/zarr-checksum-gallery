@@ -5,7 +5,7 @@ use thiserror::Error;
 use walkdir::Error as WDError;
 
 #[derive(Debug, Error)]
-pub enum WalkError {
+pub enum FSError {
     #[error("Error digesting file: {}: {source}", .path.display())]
     MD5FileError { path: PathBuf, source: io::Error },
 
@@ -31,30 +31,30 @@ pub enum WalkError {
     NotDirRootError { path: PathBuf },
 }
 
-impl WalkError {
+impl FSError {
     pub fn md5_file_error<P: AsRef<Path>>(path: P, source: io::Error) -> Self {
-        WalkError::MD5FileError {
+        FSError::MD5FileError {
             path: path.as_ref().into(),
             source,
         }
     }
 
     pub fn strip_prefix_error<P: AsRef<Path>>(path: P, basepath: P) -> Self {
-        WalkError::StripPrefixError {
+        FSError::StripPrefixError {
             path: path.as_ref().into(),
             basepath: basepath.as_ref().into(),
         }
     }
 
     pub fn stat_error<P: AsRef<Path>>(path: P, source: io::Error) -> Self {
-        WalkError::StatError {
+        FSError::StatError {
             path: path.as_ref().into(),
             source,
         }
     }
 
     pub fn readdir_error<P: AsRef<Path>>(path: P, source: io::Error) -> Self {
-        WalkError::ReaddirError {
+        FSError::ReaddirError {
             path: path.as_ref().into(),
             source,
         }
@@ -65,13 +65,13 @@ impl WalkError {
     }
 
     pub fn path_decode_error<P: AsRef<Path>>(path: P) -> Self {
-        WalkError::PathDecodeError {
+        FSError::PathDecodeError {
             path: path.as_ref().into(),
         }
     }
 
     pub fn not_dir_root_error<P: AsRef<Path>>(path: P) -> Self {
-        WalkError::NotDirRootError {
+        FSError::NotDirRootError {
             path: path.as_ref().into(),
         }
     }
@@ -94,5 +94,5 @@ pub enum ChecksumError {
     #[error(transparent)]
     ChecksumTreeError(#[from] ChecksumTreeError),
     #[error(transparent)]
-    WalkError(#[from] WalkError),
+    FSError(#[from] FSError),
 }

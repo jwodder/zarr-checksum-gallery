@@ -1,5 +1,5 @@
 use crate::checksum::nodes::*;
-use crate::errors::{ChecksumError, WalkError};
+use crate::errors::{ChecksumError, FSError};
 use crate::util::relative_to;
 use relative_path::RelativePathBuf;
 use std::fs;
@@ -12,8 +12,8 @@ struct OpenDir {
 }
 
 impl OpenDir {
-    fn new<P: AsRef<Path>>(dirpath: P, relpath: RelativePathBuf) -> Result<OpenDir, WalkError> {
-        let handle = fs::read_dir(&dirpath).map_err(|e| WalkError::readdir_error(&dirpath, e))?;
+    fn new<P: AsRef<Path>>(dirpath: P, relpath: RelativePathBuf) -> Result<OpenDir, FSError> {
+        let handle = fs::read_dir(&dirpath).map_err(|e| FSError::readdir_error(&dirpath, e))?;
         Ok(OpenDir {
             handle,
             path: dirpath.as_ref().into(),
@@ -58,7 +58,7 @@ pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, Checks
                 let path = p.path();
                 let is_dir = p
                     .file_type()
-                    .map_err(|e| WalkError::stat_error(&p.path(), e))?
+                    .map_err(|e| FSError::stat_error(&p.path(), e))?
                     .is_dir();
                 if is_dir {
                     let relpath = relative_to(&path, &dirpath)?;
@@ -69,7 +69,7 @@ pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, Checks
                         .add_file(FileChecksumNode::for_file(path, &dirpath)?);
                 }
             }
-            Some(Err(e)) => return Err(WalkError::readdir_error(&topdir.path, e).into()),
+            Some(Err(e)) => return Err(FSError::readdir_error(&topdir.path, e).into()),
             None => {
                 let OpenDir { entries, .. } = dirstack.pop().unwrap();
                 match dirstack.last_mut() {

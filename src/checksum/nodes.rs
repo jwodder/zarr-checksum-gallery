@@ -1,5 +1,5 @@
 use super::json::get_checksum_json;
-use crate::errors::WalkError;
+use crate::errors::FSError;
 use crate::util::{md5_file, md5_string, relative_to};
 use enum_dispatch::enum_dispatch;
 use relative_path::{RelativePath, RelativePathBuf};
@@ -24,7 +24,7 @@ pub struct FileChecksumNode {
 }
 
 impl FileChecksumNode {
-    pub fn for_file<P, Q>(path: P, basepath: Q) -> Result<Self, WalkError>
+    pub fn for_file<P, Q>(path: P, basepath: Q) -> Result<Self, FSError>
     where
         P: AsRef<Path>,
         Q: AsRef<Path>,
@@ -33,7 +33,7 @@ impl FileChecksumNode {
             relpath: relative_to(&path, &basepath)?,
             checksum: md5_file(&path)?,
             size: fs::metadata(&path)
-                .map_err(|e| WalkError::stat_error(&path, e))?
+                .map_err(|e| FSError::stat_error(&path, e))?
                 .len(),
         })
     }

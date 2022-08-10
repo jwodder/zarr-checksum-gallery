@@ -1,6 +1,6 @@
 use super::util::{listdir, DirEntry};
 use crate::checksum::nodes::*;
-use crate::errors::{ChecksumError, WalkError};
+use crate::errors::{ChecksumError, FSError};
 use crate::util::relative_to;
 use std::path::Path;
 
@@ -9,7 +9,7 @@ pub fn recursive_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, Checksum
     Ok(recurse(&dirpath, &dirpath)?.into_checksum())
 }
 
-fn recurse(path: &Path, basepath: &Path) -> Result<DirChecksumNode, WalkError> {
+fn recurse(path: &Path, basepath: &Path) -> Result<DirChecksumNode, FSError> {
     let relpath = if path == basepath {
         "<root>".into()
     } else {
@@ -27,6 +27,6 @@ fn recurse(path: &Path, basepath: &Path) -> Result<DirChecksumNode, WalkError> {
                 .into_iter()
                 .map(|DirEntry { path, .. }| recurse(&path, basepath).map(ZarrChecksumNode::from)),
         )
-        .collect::<Result<Vec<ZarrChecksumNode>, WalkError>>()?;
+        .collect::<Result<Vec<ZarrChecksumNode>, FSError>>()?;
     Ok(get_checksum(relpath, nodes))
 }
