@@ -1,7 +1,5 @@
 use super::util::{listdir, DirEntry};
-use crate::checksum::{
-    get_checksum, ChecksumNode, DirChecksumNode, FileChecksumNode, ZarrChecksumNode,
-};
+use crate::checksum::nodes::*;
 use crate::errors::{ChecksumError, WalkError};
 use crate::util::relative_to;
 use std::path::Path;

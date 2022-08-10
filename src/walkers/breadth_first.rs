@@ -1,5 +1,5 @@
 use super::util::{listdir, DirEntry};
-use crate::checksum::{try_compile_checksum, FileChecksumNode};
+use crate::checksum::{nodes::FileChecksumNode, try_compile_checksum};
 use crate::errors::{ChecksumError, WalkError};
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};

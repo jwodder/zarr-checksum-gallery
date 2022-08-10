@@ -1,5 +1,5 @@
 use super::util::{listdir, DirEntry};
-use crate::checksum::{compile_checksum, FileChecksumNode};
+use crate::checksum::{compile_checksum, nodes::FileChecksumNode};
 use crate::errors::ChecksumError;
 use log::{trace, warn};
 use std::ops::Deref;

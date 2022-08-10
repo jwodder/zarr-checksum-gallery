@@ -1,4 +1,4 @@
-use crate::checksum::{try_compile_checksum, FileChecksumNode};
+use crate::checksum::{nodes::FileChecksumNode, try_compile_checksum};
 use crate::errors::{ChecksumError, WalkError};
 use std::fs::metadata;
 use std::path::Path;

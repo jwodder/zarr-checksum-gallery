@@ -1,4 +1,4 @@
-use crate::checksum::{ChecksumNode, DirChecksumNode, FileChecksumNode};
+use super::nodes::*;
 use std::fmt::{Error, Write};
 
 pub(super) fn get_checksum_json(
