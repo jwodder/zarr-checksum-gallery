@@ -1,5 +1,5 @@
 use super::util::{listdir, DirEntry};
-use crate::checksum::{try_compile_checksum, FileInfo};
+use crate::checksum::{try_compile_checksum, FileChecksumNode};
 use crate::errors::{ChecksumError, WalkError};
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
@@ -7,7 +7,8 @@ use std::path::{Path, PathBuf};
 pub fn breadth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumError> {
     let dirpath = dirpath.as_ref();
     try_compile_checksum(
-        BreadthFirstIterator::new(dirpath).map(|r| r.and_then(|p| FileInfo::for_file(p, dirpath))),
+        BreadthFirstIterator::new(dirpath)
+            .map(|r| r.and_then(|p| FileChecksumNode::for_file(p, dirpath))),
     )
 }
 
@@ -20,7 +21,6 @@ impl BreadthFirstIterator {
         BreadthFirstIterator {
             queue: VecDeque::from([Ok(DirEntry {
                 path: dirpath.as_ref().into(),
-                name: String::new(),
                 is_dir: true,
             })]),
         }

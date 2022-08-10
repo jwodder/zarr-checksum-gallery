@@ -1,26 +1,34 @@
 use super::util::{listdir, DirEntry};
-use crate::checksum::{get_checksum, FileInfo, ZarrChecksum};
+use crate::checksum::{
+    get_checksum, ChecksumNode, DirChecksumNode, FileChecksumNode, ZarrChecksumNode,
+};
 use crate::errors::{ChecksumError, WalkError};
-use std::collections::HashMap;
+use crate::util::relative_to;
 use std::path::Path;
 
 pub fn recursive_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumError> {
     let dirpath = dirpath.as_ref().to_path_buf();
-    Ok(recurse(&dirpath, &dirpath)?.checksum)
+    Ok(recurse(&dirpath, &dirpath)?.into_checksum())
 }
 
-fn recurse(path: &Path, basepath: &Path) -> Result<ZarrChecksum, WalkError> {
+fn recurse(path: &Path, basepath: &Path) -> Result<DirChecksumNode, WalkError> {
+    let relpath = if path == basepath {
+        "<root>".into()
+    } else {
+        relative_to(path, basepath)?
+    };
     let entries = listdir(path)?;
     let (files, directories): (Vec<_>, Vec<_>) = entries.into_iter().partition(|e| !e.is_dir);
-    let files = files
+    let nodes = files
         .into_iter()
-        .map(|DirEntry { path, name, .. }| {
-            FileInfo::for_file(path, basepath).map(|info| (name, ZarrChecksum::from(info)))
+        .map(|DirEntry { path, .. }| {
+            FileChecksumNode::for_file(path, basepath).map(ZarrChecksumNode::from)
         })
-        .collect::<Result<HashMap<String, ZarrChecksum>, WalkError>>()?;
-    let directories = directories
-        .into_iter()
-        .map(|DirEntry { path, name, .. }| recurse(&path, basepath).map(|dgst| (name, dgst)))
-        .collect::<Result<HashMap<String, ZarrChecksum>, WalkError>>()?;
-    Ok(get_checksum(files, directories))
+        .chain(
+            directories
+                .into_iter()
+                .map(|DirEntry { path, .. }| recurse(&path, basepath).map(ZarrChecksumNode::from)),
+        )
+        .collect::<Result<Vec<ZarrChecksumNode>, WalkError>>()?;
+    Ok(get_checksum(relpath, nodes))
 }

@@ -1,5 +1,5 @@
 use super::util::{listdir, DirEntry};
-use crate::checksum::{compile_checksum, FileInfo};
+use crate::checksum::{compile_checksum, FileChecksumNode};
 use crate::errors::ChecksumError;
 use log::{trace, warn};
 use std::ops::Deref;
@@ -139,7 +139,6 @@ pub fn fastio_checksum<P: AsRef<Path>>(
     let dirpath = dirpath.as_ref();
     let stack = Arc::new(JobStack::new([DirEntry {
         path: dirpath.to_path_buf(),
-        name: String::new(),
         is_dir: true,
     }]));
     let (sender, receiver) = channel();
@@ -164,7 +163,7 @@ pub fn fastio_checksum<P: AsRef<Path>>(
                         Err(e) => Some(Err(e)),
                     }
                 } else {
-                    Some(FileInfo::for_file(&entry.path, &basepath))
+                    Some(FileChecksumNode::for_file(&entry.path, &basepath))
                 };
                 if let Some(v) = output {
                     // If we've shut down, don't send anything except Errs

@@ -1,4 +1,4 @@
-use crate::checksum::{try_compile_checksum, FileInfo};
+use crate::checksum::{try_compile_checksum, FileChecksumNode};
 use crate::errors::{ChecksumError, WalkError};
 use std::fs::metadata;
 use std::path::Path;
@@ -28,7 +28,7 @@ pub fn walkdir_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumEr
             .map(|r| {
                 r.map_or_else(
                     |exc| Err(WalkError::walkdir_error(exc)),
-                    |e| FileInfo::for_file(e.path(), dirpath),
+                    |e| FileChecksumNode::for_file(e.path(), dirpath),
                 )
             }),
     )

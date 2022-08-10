@@ -1,31 +1,19 @@
-use crate::checksum::ZarrChecksum;
-use std::collections::HashMap;
+use crate::checksum::{ChecksumNode, DirChecksumNode, FileChecksumNode};
 use std::fmt::{Error, Write};
 
 pub(super) fn get_checksum_json(
-    files: HashMap<String, ZarrChecksum>,
-    directories: HashMap<String, ZarrChecksum>,
+    files: Vec<FileChecksumNode>,
+    directories: Vec<DirChecksumNode>,
 ) -> String {
-    let mut filevec = files
-        .into_iter()
-        .map(|(name, checksum)| ChecksumEntry {
-            name,
-            digest: checksum.checksum,
-            size: checksum.size,
-        })
-        .collect::<Vec<_>>();
+    let mut filevec = files.into_iter().map(JSONEntry::from).collect::<Vec<_>>();
     filevec.sort();
     let mut dirvec = directories
         .into_iter()
-        .filter(|(_, checksum)| checksum.file_count > 0)
-        .map(|(name, checksum)| ChecksumEntry {
-            name,
-            digest: checksum.checksum,
-            size: checksum.size,
-        })
+        .filter(|node| node.file_count > 0)
+        .map(JSONEntry::from)
         .collect::<Vec<_>>();
     dirvec.sort();
-    let collection = ChecksumCollection {
+    let collection = JSONEntryCollection {
         directories: dirvec,
         files: filevec,
     };
@@ -35,13 +23,13 @@ pub(super) fn get_checksum_json(
 }
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-struct ChecksumEntry {
+struct JSONEntry {
     name: String,
     digest: String,
     size: u64,
 }
 
-impl ChecksumEntry {
+impl JSONEntry {
     fn write_json<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_str(r#"{"digest":"#)?;
         write_json_str(&self.digest, writer)?;
@@ -52,13 +40,33 @@ impl ChecksumEntry {
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-struct ChecksumCollection {
-    directories: Vec<ChecksumEntry>,
-    files: Vec<ChecksumEntry>,
+impl From<FileChecksumNode> for JSONEntry {
+    fn from(node: FileChecksumNode) -> JSONEntry {
+        JSONEntry {
+            name: node.name().to_string(),
+            digest: node.checksum,
+            size: node.size,
+        }
+    }
 }
 
-impl ChecksumCollection {
+impl From<DirChecksumNode> for JSONEntry {
+    fn from(node: DirChecksumNode) -> JSONEntry {
+        JSONEntry {
+            name: node.name().to_string(),
+            digest: node.checksum,
+            size: node.size,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct JSONEntryCollection {
+    directories: Vec<JSONEntry>,
+    files: Vec<JSONEntry>,
+}
+
+impl JSONEntryCollection {
     fn write_json<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_str(r#"{"directories":["#)?;
         for (i, d) in self.directories.iter().enumerate() {
@@ -125,32 +133,24 @@ mod test {
 
     #[test]
     fn test_get_checksum_json() {
-        let files = HashMap::from([
-            (
-                "foo".into(),
-                ZarrChecksum {
-                    checksum: "0123456789abcdef0123456789abcdef".into(),
-                    size: 69105,
-                    file_count: 1,
-                },
-            ),
-            (
-                "bar".into(),
-                ZarrChecksum {
-                    checksum: "abcdef0123456789abcdef0123456789".into(),
-                    size: 42,
-                    file_count: 1,
-                },
-            ),
-        ]);
-        let directories = HashMap::from([(
-            "quux".into(),
-            ZarrChecksum {
-                checksum: "0987654321fedcba0987654321fedcba-23--65537".into(),
-                size: 65537,
-                file_count: 23,
+        let files = vec![
+            FileChecksumNode {
+                relpath: "foo".into(),
+                checksum: "0123456789abcdef0123456789abcdef".into(),
+                size: 69105,
             },
-        )]);
+            FileChecksumNode {
+                relpath: "bar".into(),
+                checksum: "abcdef0123456789abcdef0123456789".into(),
+                size: 42,
+            },
+        ];
+        let directories = Vec::from([DirChecksumNode {
+            relpath: "quux".into(),
+            checksum: "0987654321fedcba0987654321fedcba-23--65537".into(),
+            size: 65537,
+            file_count: 23,
+        }]);
         let json = get_checksum_json(files, directories);
         assert_eq!(
             json,
@@ -160,15 +160,13 @@ mod test {
 
     #[test]
     fn test_get_checksum_json_empty_dir() {
-        let files = HashMap::new();
-        let directories = HashMap::from([(
-            "quux".into(),
-            ZarrChecksum {
-                checksum: "481a2f77ab786a0f45aafd5db0971caa-0--0".into(),
-                size: 0,
-                file_count: 0,
-            },
-        )]);
+        let files = Vec::new();
+        let directories = vec![DirChecksumNode {
+            relpath: "quux".into(),
+            checksum: "481a2f77ab786a0f45aafd5db0971caa-0--0".into(),
+            size: 0,
+            file_count: 0,
+        }];
         let json = get_checksum_json(files, directories);
         assert_eq!(json, r#"{"directories":[],"files":[]}"#);
     }
