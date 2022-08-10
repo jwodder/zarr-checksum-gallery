@@ -9,7 +9,7 @@ pub enum FSError {
     #[error("Error digesting file: {}: {source}", .path.display())]
     MD5FileError { path: PathBuf, source: io::Error },
 
-    #[error("Path {path:?} is not a descendant of {basepath:?}")]
+    #[error("Path {path:?} is not a normalized descendant of {basepath:?}")]
     StripPrefixError { path: PathBuf, basepath: PathBuf },
 
     #[error("Error stat'ing file: {}: {source}", .path.display())]
