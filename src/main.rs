@@ -6,8 +6,11 @@ use zarr_checksum_gallery::*;
 #[derive(Clone, Debug, Eq, Parser, PartialEq)]
 #[clap(version)]
 struct Arguments {
-    #[clap(short, long)]
+    #[clap(long)]
     debug: bool,
+
+    #[clap(long)]
+    trace: bool,
 
     #[clap(subcommand)]
     command: Command,
@@ -48,16 +51,21 @@ impl Command {
 
 fn main() -> ExitCode {
     let args = Arguments::parse();
-    if args.debug {
-        fern::Dispatch::new()
-            .format(|out, message, record| {
-                out.finish(format_args!("[{:<5}] {}", record.level(), message))
-            })
-            .level(log::LevelFilter::Trace)
-            .chain(std::io::stderr())
-            .apply()
-            .unwrap();
-    }
+    let log_level = if args.trace {
+        log::LevelFilter::Trace
+    } else if args.debug {
+        log::LevelFilter::Debug
+    } else {
+        log::LevelFilter::Warn
+    };
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!("[{:<5}] {}", record.level(), message))
+        })
+        .level(log_level)
+        .chain(std::io::stderr())
+        .apply()
+        .unwrap();
     match args.command.run() {
         Ok(checksum) => {
             println!("{}", checksum);

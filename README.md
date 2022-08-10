@@ -44,8 +44,11 @@ directory contents & layout; if it is not, it is a bug.
 Global Options
 --------------
 
-- `--debug` — Show DEBUG log messages.  Not all implementations emit log
-  messages.
+- `--debug` — Show DEBUG log messages listing the checksum for each file &
+  directory as it's computed.
+
+- `--trace` — Show TRACE log messages in addition to DEBUG messages.  Not all
+  implementations emit TRACE logs.
 
 Implementations
 ---------------

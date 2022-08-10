@@ -3,6 +3,7 @@ use crate::errors::FSError;
 use crate::util::{md5_file, md5_string};
 use crate::zarr::{relative_to, EntryPath};
 use enum_dispatch::enum_dispatch;
+use log::debug;
 use std::fs;
 use std::path::Path;
 
@@ -134,6 +135,7 @@ where
     }
     let md5 = md5_string(&get_checksum_json(files, directories));
     let checksum = format!("{md5}-{file_count}--{size}");
+    debug!("Computed checksum for directory {relpath}: {checksum}");
     DirChecksumNode {
         relpath,
         checksum,
