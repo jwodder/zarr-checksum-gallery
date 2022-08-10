@@ -1,11 +1,12 @@
 use super::json::get_checksum_json;
 use crate::errors::FSError;
-use crate::util::{md5_file, md5_string};
+use crate::util::{async_md5_file, md5_file, md5_string};
 use crate::zarr::{relative_to, EntryPath};
 use enum_dispatch::enum_dispatch;
 use log::debug;
 use std::fs;
 use std::path::Path;
+use tokio::fs as afs;
 
 #[enum_dispatch]
 pub trait ChecksumNode {
@@ -34,6 +35,21 @@ impl FileChecksumNode {
             relpath: relative_to(&path, &basepath)?,
             checksum: md5_file(&path)?,
             size: fs::metadata(&path)
+                .map_err(|e| FSError::stat_error(&path, e))?
+                .len(),
+        })
+    }
+
+    pub async fn async_for_file<P, Q>(path: P, basepath: Q) -> Result<Self, FSError>
+    where
+        P: AsRef<Path>,
+        Q: AsRef<Path>,
+    {
+        Ok(FileChecksumNode {
+            relpath: relative_to(&path, &basepath)?,
+            checksum: async_md5_file(&path).await?,
+            size: afs::metadata(&path)
+                .await
                 .map_err(|e| FSError::stat_error(&path, e))?
                 .len(),
         })

@@ -1,11 +1,13 @@
 mod breadth_first;
 mod depth_first;
+mod fastasync;
 mod fastio;
 mod recursive;
 mod util;
 mod walkd;
 pub use breadth_first::*;
 pub use depth_first::*;
+pub use fastasync::*;
 pub use fastio::*;
 pub use recursive::*;
 pub use walkd::*;

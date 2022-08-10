@@ -18,8 +18,9 @@ log = "0.4.17"
 md-5 = "0.10.1"
 num_cpus = "1.13.1"
 thiserror = "1.0.32"
-tokio = { version = "1.20.1", features = ["fs", "rt", "rt-multi-thread"] }
+tokio = { version = "1.20.1", features = ["fs", "rt", "rt-multi-thread", "sync"] }
 tokio-stream = { version = "0.1.9", features = ["fs"] }
+tokio-util = { version = "0.7.3", features = ["io"] }
 walkdir = "2.3.2"
 
 [dev-dependencies]
