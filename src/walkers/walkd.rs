@@ -16,6 +16,7 @@ pub fn walkdir_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumEr
     }
     try_compile_checksum(
         WalkDir::new(dirpath)
+            .follow_links(true)
             .into_iter()
             // We can't use walkdir's filter_entry(), because that prevents
             // descending into directories that don't match the predicate.
