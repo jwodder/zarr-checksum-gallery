@@ -26,7 +26,7 @@ with:
 
     git clone https://github.com/jwodder/zarr-checksum-gallery
     cd zarr-checksum-gallery
-    cargo build
+    cargo build  # or `cargo build --release` to enable optimizations
     # You can now run the binary with `cargo run -- <args>` while in this
     # repository.
 
