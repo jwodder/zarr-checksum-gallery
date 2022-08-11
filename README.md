@@ -64,6 +64,11 @@ Implementations
 
   **Options:**
 
+    - `-t <NUM>`/`--threads <NUM>` — Set the number of threads for the async
+      runtime to use.  A value of 0 or 1 means to run all tasks in the main
+      thread.  The default value is the number of logical CPU cores on the
+      machine.
+
     - `-w <NUM>`/`--workers <NUM>` — Set the number of worker tasks to use.
       The default value is the number of logical CPU cores on the machine.
 

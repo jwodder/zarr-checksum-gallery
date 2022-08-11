@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use std::process::ExitCode;
+use tokio::runtime::Builder;
 use zarr_checksum_gallery::*;
 
 #[derive(Clone, Debug, Eq, Parser, PartialEq)]
@@ -26,6 +27,8 @@ enum Command {
     },
     Fastasync {
         #[clap(short, long, default_value_t = num_cpus::get())]
+        threads: usize,
+        #[clap(short, long, default_value_t = num_cpus::get())]
         workers: usize,
         dirpath: PathBuf,
     },
@@ -47,11 +50,22 @@ impl Command {
         match self {
             Command::BreadthFirst { dirpath } => breadth_first_checksum(dirpath),
             Command::DepthFirst { dirpath } => depth_first_checksum(dirpath),
-            Command::Fastasync { workers, dirpath } => tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .build()
-                .unwrap()
-                .block_on(fastasync_checksum(dirpath, workers)),
+            Command::Fastasync {
+                threads,
+                workers,
+                dirpath,
+            } => {
+                let rt = if threads > 1 {
+                    Builder::new_multi_thread()
+                        .worker_threads(threads)
+                        .enable_all()
+                        .build()
+                        .unwrap()
+                } else {
+                    Builder::new_current_thread().enable_all().build().unwrap()
+                };
+                rt.block_on(fastasync_checksum(dirpath, workers))
+            }
             Command::Fastio { threads, dirpath } => fastio_checksum(dirpath, threads),
             Command::Recursive { dirpath } => recursive_checksum(dirpath),
             Command::Walkdir { dirpath } => walkdir_checksum(dirpath),
