@@ -4,6 +4,15 @@ use std::fs::metadata;
 use std::path::Path;
 use walkdir::WalkDir;
 
+/// Traverse a directory tree using [the `walkdir`
+/// crate](https://crates.io/crates/walkdir) and checksum it
+///
+/// This builds an in-memory tree of all file checksums for computing the final
+/// Zarr checksum.
+///
+/// If `dirpath` is not a directory, this will return an
+/// [`FSError::NotDirRootError`] immediately.  This is unlike the other
+/// walkers, which return an [`FSError::ReaddirError`] in such a situation.
 pub fn walkdir_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumError> {
     let dirpath = dirpath.as_ref();
     // Without this check, walkdir will return only the file `dirpath`, leading

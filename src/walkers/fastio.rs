@@ -132,6 +132,13 @@ impl<T> Drop for JobStackItem<'_, T> {
     }
 }
 
+/// Traverse & checksum a directory using a stack of jobs distributed over
+/// multiple threads
+///
+/// The `threads` argument determines the number of worker threads to use.
+///
+/// This builds an in-memory tree of all file checksums for computing the final
+/// Zarr checksum.
 pub fn fastio_checksum<P: AsRef<Path>>(
     dirpath: P,
     threads: usize,

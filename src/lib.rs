@@ -1,3 +1,4 @@
+//! Various implementations of Dandi Zarr checksumming
 pub mod checksum;
 pub mod errors;
 mod util;

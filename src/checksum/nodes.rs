@@ -8,16 +8,31 @@ use std::fs;
 use std::path::Path;
 use tokio::fs as afs;
 
+/// Trait for behavior shared by [`FileChecksumNode`] and [`DirChecksumNode`]
 #[enum_dispatch]
 pub trait ChecksumNode {
+    /// Return the path within the Zarr for which this is a checksum
     fn relpath(&self) -> &EntryPath;
+
+    /// Return the final component of the path
     fn name(&self) -> &str;
+
+    /// Return the checksum for the file or directory
     fn checksum(&self) -> &str;
+
+    /// Consume the node and return the checksum for the file or directory
     fn into_checksum(self) -> String;
+
+    /// Return the size of the file or the total size of all files within the
+    /// directory
     fn size(&self) -> u64;
+
+    /// Return the number of files within the directory, or 1 for a
+    /// [`FileChecksumNode`]
     fn file_count(&self) -> u64;
 }
 
+/// An MD5 checksum computed for a file in a Zarr directory
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct FileChecksumNode {
     pub(super) relpath: EntryPath,
@@ -26,6 +41,7 @@ pub struct FileChecksumNode {
 }
 
 impl FileChecksumNode {
+    /// Compute the checksum for the file `path` within the Zarr at `basepath`
     pub fn for_file<P, Q>(path: P, basepath: Q) -> Result<Self, FSError>
     where
         P: AsRef<Path>,
@@ -44,6 +60,8 @@ impl FileChecksumNode {
         })
     }
 
+    /// Asynchronously compute the checksum for the file `path` within the Zarr
+    /// at `basepath`
     pub async fn async_for_file<P, Q>(path: P, basepath: Q) -> Result<Self, FSError>
     where
         P: AsRef<Path>,
@@ -90,6 +108,7 @@ impl ChecksumNode for FileChecksumNode {
     }
 }
 
+/// A Zarr checksum computed for a directory inside a Zarr directory
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DirChecksumNode {
     pub(super) relpath: EntryPath,
@@ -124,6 +143,7 @@ impl ChecksumNode for DirChecksumNode {
     }
 }
 
+/// An enum of [`FileChecksumNode`] and [`DirChecksumNode`]
 #[enum_dispatch(ChecksumNode)]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum ZarrChecksumNode {
@@ -132,15 +152,25 @@ pub enum ZarrChecksumNode {
 }
 
 impl ZarrChecksumNode {
+    /// True iff this node represents a directory checksum
     pub fn is_dir(&self) -> bool {
         matches!(self, ZarrChecksumNode::Directory(_))
     }
 
+    /// True iff this node represents a file checksum
     pub fn is_file(&self) -> bool {
         matches!(self, ZarrChecksumNode::File(_))
     }
 }
 
+/// Compute the checksum for the directory at relative path `relpath` within a
+/// Zarr, where the entries of the directory have the checksums supplied in
+/// `iter`.
+///
+/// It is the caller's responsibility to ensure that `iter` contains all & only
+/// entries from the given directory and that no two items in `iter` have the
+/// same [`name`][ChecksumNode::name].  If this condition is not met,
+/// `get_checksum()` will return an inaccurate value.
 pub fn get_checksum<I>(relpath: EntryPath, iter: I) -> DirChecksumNode
 where
     I: IntoIterator<Item = ZarrChecksumNode>,

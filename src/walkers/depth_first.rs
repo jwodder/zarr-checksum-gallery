@@ -47,6 +47,10 @@ impl ZarrDirectory {
     }
 }
 
+/// Traverse & checksum a directory tree depth-first and iteratively
+///
+/// The checksum for each directory is computed as soon as the checksums for
+/// all of its entries are computed.
 pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumError> {
     let dirpath = PathBuf::from(dirpath.as_ref());
     let mut dirstack = vec![OpenDir::new(&dirpath, "<root>".try_into().unwrap())?];

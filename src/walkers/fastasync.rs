@@ -100,6 +100,13 @@ impl<T> AsyncJobStack<T> {
     }
 }
 
+/// Asynchronously traverse & checksum a directory using a stack of jobs
+/// distributed over multiple worker tasks
+///
+/// The `workers` argument determines the number of worker tasks to use.
+///
+/// This builds an in-memory tree of all file checksums for computing the final
+/// Zarr checksum.
 pub async fn fastasync_checksum<P: AsRef<Path>>(
     dirpath: P,
     workers: usize,

@@ -3,6 +3,8 @@ use crate::errors::ChecksumTreeError;
 use crate::zarr::EntryPath;
 use std::collections::{hash_map::Entry, HashMap};
 
+/// A tree of [`FileChecksumNode`]s, for computing the final checksum for an
+/// entire Zarr
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ChecksumTree(DirTree);
 
@@ -19,18 +21,22 @@ enum TreeNode {
 }
 
 impl ChecksumTree {
+    /// Create a new `ChecksumTree`
     pub fn new() -> Self {
         ChecksumTree(DirTree::new("<root>".try_into().unwrap()))
     }
 
+    /// Compute the Zarr checksum for the entire tree
     pub fn checksum(&self) -> String {
         self.0.to_checksum_node().into_checksum()
     }
 
+    /// Consume the tree and return its Zarr checksum
     pub fn into_checksum(self) -> String {
         DirChecksumNode::from(self.0).into_checksum()
     }
 
+    /// Add the checksum for a file to the tree
     pub fn add_file(&mut self, node: FileChecksumNode) -> Result<(), ChecksumTreeError> {
         let mut d = &mut self.0.children;
         for parent in node.relpath().parents() {
@@ -53,6 +59,8 @@ impl ChecksumTree {
         Ok(())
     }
 
+    /// Construct a new `ChecksumTree` from an iterator of
+    /// [`FileChecksumNode`]s
     pub fn from_files<I: IntoIterator<Item = FileChecksumNode>>(
         iter: I,
     ) -> Result<ChecksumTree, ChecksumTreeError> {

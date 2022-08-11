@@ -4,6 +4,10 @@ use crate::errors::{ChecksumError, FSError};
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 
+/// Traverse & checksum a directory tree breadth-first and iteratively
+///
+/// This builds an in-memory tree of all file checksums for computing the final
+/// Zarr checksum.
 pub fn breadth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumError> {
     let dirpath = dirpath.as_ref();
     try_compile_checksum(

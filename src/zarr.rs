@@ -2,18 +2,30 @@ use crate::errors::{EntryPathError, FSError};
 use std::fmt;
 use std::path::{Component, Path};
 
-// A normalized, nonempty, forward-slash-separated UTF-8 encoded relative path
+/// A normalized, nonempty, forward-slash-separated UTF-8 encoded relative path
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct EntryPath(Vec<String>);
 
 impl EntryPath {
+    /// Return the basename of the path
     pub fn file_name(&self) -> &str {
         self.0
             .last()
             .expect("Invariant violated: EntryPath is empty")
     }
 
-    pub(crate) fn parents(&self) -> Parents<'_> {
+    /// Return an iterator over the parent paths of the path, starting at the
+    /// first component and stopping before the file name
+    ///
+    /// ```
+    /// # use zarr_checksum_gallery::zarr::EntryPath;
+    /// let path = EntryPath::try_from("foo/bar/baz").unwrap();
+    /// let mut parents = path.parents();
+    /// assert_eq!(parents.next().unwrap().to_string(), "foo");
+    /// assert_eq!(parents.next().unwrap().to_string(), "foo/bar");
+    /// assert_eq!(parents.next(), None);
+    /// ```
+    pub fn parents(&self) -> Parents<'_> {
         Parents {
             parts: &self.0,
             i: 0,
@@ -63,7 +75,12 @@ impl TryFrom<&str> for EntryPath {
     }
 }
 
-pub(crate) struct Parents<'a> {
+/// Iterator over the parent paths of an [`EntryPath`]
+///
+/// The iterator's items are themselves [`EntryPath`]s.
+///
+/// This struct is returned by [`EntryPath::parents()`].
+pub struct Parents<'a> {
     parts: &'a Vec<String>,
     i: usize,
 }
@@ -81,6 +98,7 @@ impl<'a> Iterator for Parents<'a> {
     }
 }
 
+/// Compute `path` relative to `basepath` as an [`EntryPath`]
 pub(crate) fn relative_to<P, Q>(path: P, basepath: Q) -> Result<EntryPath, FSError>
 where
     P: AsRef<Path>,
@@ -136,7 +154,7 @@ mod tests {
 
     #[test]
     fn test_parents() {
-        let path = EntryPath::try_from(Path::new("foo/bar/baz")).unwrap();
+        let path = EntryPath::try_from("foo/bar/baz").unwrap();
         let mut parents = path.parents();
         assert_eq!(parents.next().unwrap().to_string(), "foo");
         assert_eq!(parents.next().unwrap().to_string(), "foo/bar");
@@ -145,7 +163,7 @@ mod tests {
 
     #[test]
     fn test_parents_len_1() {
-        let path = EntryPath::try_from(Path::new("foo")).unwrap();
+        let path = EntryPath::try_from("foo").unwrap();
         let mut parents = path.parents();
         assert_eq!(parents.next(), None);
     }

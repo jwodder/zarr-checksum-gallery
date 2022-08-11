@@ -1,3 +1,11 @@
+//! Various implementations of directory traversal & checksumming
+//!
+//! Each directory checksumming function returns either `Ok(String)`,
+//! containing the Zarr checksum for the specified directory, or
+//! `Err(ChecksumError)`, which can wrap either an
+//! [`FSError`][crate::errors::FSError] or a
+//! [`ChecksumTreeError`][crate::errors::ChecksumError].  The latter error type
+//! indicates a bug in the traversal function.
 mod breadth_first;
 mod depth_first;
 mod fastasync;
