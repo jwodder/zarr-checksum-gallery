@@ -10,11 +10,11 @@
 //! [`ChecksumTree`] from [`FileChecksumNode`]s, or by using just
 //! [`compile_checksum()`] or [`try_compile_checksum()`].
 mod json;
-pub mod nodes;
-pub mod tree;
-use self::nodes::FileChecksumNode;
-use self::tree::ChecksumTree;
+pub(crate) mod nodes;
+mod tree;
 use crate::errors::{ChecksumError, ChecksumTreeError, FSError};
+pub use nodes::*;
+pub use tree::*;
 
 /// Compute a checksum for a Zarr from an iterator of [`FileChecksumNode`]s for
 /// each file within

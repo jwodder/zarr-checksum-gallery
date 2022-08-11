@@ -84,7 +84,7 @@ impl FSError {
 }
 
 /// Error for failure to construct a
-/// [`ChecksumTree`][crate::checksum::tree::ChecksumTree] due to invalid input
+/// [`ChecksumTree`][crate::checksum::ChecksumTree] due to invalid input
 #[derive(Debug, Error)]
 pub enum ChecksumTreeError {
     /// Returned when a node would be added to a `ChecksumTree` in which a
