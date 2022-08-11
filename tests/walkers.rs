@@ -356,7 +356,7 @@ fn test_depth_first_checksum(#[case] case: Option<TestCase>) {
 }
 
 #[apply(test_cases)]
-#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+#[tokio::test]
 async fn test_fastasync_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
         let r = fastasync_checksum(case.path(), num_cpus::get()).await;
