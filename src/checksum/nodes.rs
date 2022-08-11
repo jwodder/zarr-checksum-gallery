@@ -31,12 +31,16 @@ impl FileChecksumNode {
         P: AsRef<Path>,
         Q: AsRef<Path>,
     {
+        let relpath = relative_to(&path, &basepath)?;
+        let size = fs::metadata(&path)
+            .map_err(|e| FSError::stat_error(&path, e))?
+            .len();
+        let checksum = md5_file(&path)?;
+        debug!("Computed checksum for file {relpath}: {checksum}");
         Ok(FileChecksumNode {
-            relpath: relative_to(&path, &basepath)?,
-            checksum: md5_file(&path)?,
-            size: fs::metadata(&path)
-                .map_err(|e| FSError::stat_error(&path, e))?
-                .len(),
+            relpath,
+            checksum,
+            size,
         })
     }
 
@@ -45,13 +49,17 @@ impl FileChecksumNode {
         P: AsRef<Path>,
         Q: AsRef<Path>,
     {
+        let relpath = relative_to(&path, &basepath)?;
+        let size = afs::metadata(&path)
+            .await
+            .map_err(|e| FSError::stat_error(&path, e))?
+            .len();
+        let checksum = async_md5_file(&path).await?;
+        debug!("Computed checksum for file {relpath}: {checksum}");
         Ok(FileChecksumNode {
-            relpath: relative_to(&path, &basepath)?,
-            checksum: async_md5_file(&path).await?,
-            size: afs::metadata(&path)
-                .await
-                .map_err(|e| FSError::stat_error(&path, e))?
-                .len(),
+            relpath,
+            checksum,
+            size,
         })
     }
 }
