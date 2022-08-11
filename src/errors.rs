@@ -3,9 +3,8 @@ use crate::zarr::EntryPath;
 use std::io;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
-use walkdir::Error as WDError;
 
-/// Error type returned when something goes wrong while interacting with the
+/// Error returned when something goes wrong while interacting with the
 /// filesystem
 #[derive(Debug, Error)]
 pub enum FSError {
@@ -14,10 +13,13 @@ pub enum FSError {
     #[error("Error digesting file: {}: {source}", .path.display())]
     MD5FileError { path: PathBuf, source: io::Error },
 
+    /// Returned when an attempt is made to compute `path` relative to
+    /// `basepath` but the former is not a valid, normalized, UTF-8 decodable
+    /// descendant of the latter
     #[error("Path {path:?} is not a normalized & decodable descendant of {basepath:?}")]
     RelativePathError { path: PathBuf, basepath: PathBuf },
 
-    /// Returned when an error occurs while trying to fetch a file's filesystem
+    /// Returned when an error occurs while trying to fetch a path's filesystem
     /// metadata
     #[error("Error stat'ing file: {}: {source}", .path.display())]
     StatError { path: PathBuf, source: io::Error },
@@ -32,7 +34,7 @@ pub enum FSError {
     #[error("Error walking directory: {source}")]
     WalkdirError {
         #[from]
-        source: WDError,
+        source: walkdir::Error,
     },
 
     /// Returned by [`walkdir_checksum()`][crate::walkdir_checksum] when given
@@ -70,7 +72,7 @@ impl FSError {
         }
     }
 
-    pub(crate) fn walkdir_error(e: WDError) -> Self {
+    pub(crate) fn walkdir_error(e: walkdir::Error) -> Self {
         e.into()
     }
 
@@ -81,13 +83,25 @@ impl FSError {
     }
 }
 
+/// Error for failure to construct a
+/// [`ChecksumTree`][crate::checksum::tree::ChecksumTree] due to invalid input
 #[derive(Debug, Error)]
 pub enum ChecksumTreeError {
+    /// Returned when a node would be added to a `ChecksumTree` in which a
+    /// parent path of the node is already present as a file
     #[error("Path type conflict error for {path:?}")]
-    PathTypeConflict { path: EntryPath },
+    PathTypeConflict {
+        /// The path of the node that would have been added
+        path: EntryPath,
+    },
 
+    /// Returned when a node would be added to a `ChecksumTree` which already
+    /// contains a file or directory at the node's path
     #[error("File {path:?} added to checksum tree twice")]
-    DoubleAdd { path: EntryPath },
+    DoubleAdd {
+        /// The path of the node that would have been added
+        path: EntryPath,
+    },
 }
 
 /// An enum of [`ChecksumTreeError`] and [`FSError`]
@@ -102,6 +116,8 @@ pub enum ChecksumError {
 /// Error returned when trying to construct an
 /// [`EntryPath`][crate::zarr::EntryPath] from an invalid, unnormalized, or
 /// undecodable relative path
+///
+/// The error contains the invalid path in question as a [`PathBuf`].
 #[derive(Debug, Error)]
 #[error("Invalid, unnormalized, or undecodable relative path: {0:?}")]
 pub struct EntryPathError(pub PathBuf);

@@ -4,7 +4,7 @@ use crate::zarr::EntryPath;
 use std::collections::{hash_map::Entry, HashMap};
 
 /// A tree of [`FileChecksumNode`]s, for computing the final checksum for an
-/// entire Zarr
+/// entire Zarr one file at a time
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ChecksumTree(DirTree);
 
