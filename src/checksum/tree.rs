@@ -5,6 +5,13 @@ use std::collections::{hash_map::Entry, HashMap};
 
 /// A tree of [`FileChecksumNode`]s, for computing the final checksum for an
 /// entire Zarr one file at a time
+///
+/// A `ChecksumTree` can be built up by creating an instance with
+/// [`ChecksumTree::new`] and then adding [`FileChecksumNode`]s one at a time
+/// with [`add_file()`][ChecksumTree::add_file], after which the final checksum
+/// can be retrieved with [`checksum()`][ChecksumTree::checksum] or
+/// [`into_checksum()`][ChecksumTree::into_checksum].  Alternatively, these
+/// steps can be done all at once by calling [`ChecksumTree::from_files`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ChecksumTree(DirTree);
 

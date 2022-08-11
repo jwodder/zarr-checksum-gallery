@@ -1,4 +1,4 @@
-//! Types for general operations on Zarrs and their entries
+//! General operations on Zarrs and their entries
 use crate::errors::{EntryPathError, FSError};
 use std::fmt;
 use std::path::{Component, Path};
