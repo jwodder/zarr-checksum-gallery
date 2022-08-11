@@ -4,43 +4,65 @@ use std::process::ExitCode;
 use tokio::runtime::Builder;
 use zarr_checksum_gallery::*;
 
+/// Compute the Dandi Zarr checksum for a directory
 #[derive(Clone, Debug, Eq, Parser, PartialEq)]
 #[clap(version)]
 struct Arguments {
+    /// Show DEBUG log messages
     #[clap(long)]
     debug: bool,
 
+    /// Show TRACE log messages
     #[clap(long)]
     trace: bool,
 
+    /// The tree-traversal implementation to use
     #[clap(subcommand)]
     command: Command,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Subcommand)]
 enum Command {
+    /// Traverse the directory breadth-first
     BreadthFirst {
+        /// Path to the directory to checksum
         dirpath: PathBuf,
     },
+    /// Traverse the directory depth-first & iteratively
     DepthFirst {
+        /// Path to the directory to checksum
         dirpath: PathBuf,
     },
+    /// Do an asynchronous directory traversal
     Fastasync {
+        /// Set the number of threads for the async runtime to use
         #[clap(short, long, default_value_t = num_cpus::get())]
         threads: usize,
+
+        /// Set the number of worker tasks to use
         #[clap(short, long, default_value_t = num_cpus::get())]
         workers: usize,
+
+        /// Path to the directory to checksum
         dirpath: PathBuf,
     },
+    /// Do a multithreaded directory traversal
     Fastio {
+        /// Set the number of threads to use
         #[clap(short, long, default_value_t = num_cpus::get())]
         threads: usize,
+
+        /// Path to the directory to checksum
         dirpath: PathBuf,
     },
+    /// Traverse the directory depth-first & recursively
     Recursive {
+        /// Path to the directory to checksum
         dirpath: PathBuf,
     },
+    /// Traverse the directory using the 'walkdir' crate
     Walkdir {
+        /// Path to the directory to checksum
         dirpath: PathBuf,
     },
 }
