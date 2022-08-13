@@ -4,7 +4,7 @@ use std::fmt;
 use std::path::{Component, Path};
 
 /// A normalized, nonempty, forward-slash-separated UTF-8 encoded relative path
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct EntryPath(Vec<String>);
 
 impl EntryPath {
@@ -31,6 +31,22 @@ impl EntryPath {
             parts: &self.0,
             i: 0,
         }
+    }
+}
+
+impl fmt::Debug for EntryPath {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("\"")?;
+        for (i, part) in self.0.iter().enumerate() {
+            if i > 0 {
+                f.write_str("/")?;
+            }
+            for c in part.chars() {
+                f.write_str(&c.escape_debug().to_string())?;
+            }
+        }
+        f.write_str("\"")?;
+        Ok(())
     }
 }
 
@@ -167,5 +183,15 @@ mod tests {
         let path = EntryPath::try_from("foo").unwrap();
         let mut parents = path.parents();
         assert_eq!(parents.next(), None);
+    }
+
+    #[rstest]
+    #[case("foo", r#""foo""#)]
+    #[case("foo/bar", r#""foo/bar""#)]
+    #[case("foo\n/\tbar", r#""foo\n/\tbar""#)]
+    #[case("foo\x1B—🐐bar", r#""foo\u{1b}—🐐bar""#)]
+    fn test_debug(#[case] path: &str, #[case] repr: &str) {
+        let path = EntryPath::try_from(path).unwrap();
+        assert_eq!(format!("{path:?}"), repr);
     }
 }
