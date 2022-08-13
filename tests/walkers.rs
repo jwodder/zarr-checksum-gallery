@@ -363,3 +363,11 @@ async fn test_fastasync_checksum(#[case] case: Option<TestCase>) {
         case.check(r);
     }
 }
+
+#[apply(test_cases)]
+fn test_collapsio_checksum(#[case] case: Option<TestCase>) {
+    if let Some(case) = case {
+        let r = collapsio_checksum(case.path(), num_cpus::get());
+        case.check(r);
+    }
+}

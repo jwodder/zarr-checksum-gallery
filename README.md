@@ -56,6 +56,14 @@ Implementations
 - `breadth-first` — Walk the directory tree iteratively & breadth-first,
   building a tree of file checksums in memory
 
+- `collapsio` — Walk the directory tree using multiple threads, computing the
+  checksum for each directory as soon as possible
+
+  **Options:**
+
+    - `-t <NUM>`/`--threads <NUM>` — Set the number of threads to use.  The
+      default value is the number of logical CPU cores on the machine.
+
 - `depth-first` — Walk the directory tree iteratively & depth-first, computing
   the checksum for each directory as soon as possible
 

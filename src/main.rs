@@ -23,17 +23,28 @@ struct Arguments {
 
 #[derive(Clone, Debug, Eq, PartialEq, Subcommand)]
 enum Command {
-    /// Traverse the directory breadth-first
+    /// Traverse the directory breadth-first and build a tree of checksums
     BreadthFirst {
         /// Path to the directory to checksum
         dirpath: PathBuf,
     },
-    /// Traverse the directory depth-first & iteratively
+    /// Do a multithreaded directory traversal, computing directory checksums
+    /// as soon as possible
+    Collapsio {
+        /// Set the number of threads to use
+        #[clap(short, long, default_value_t = num_cpus::get())]
+        threads: usize,
+
+        /// Path to the directory to checksum
+        dirpath: PathBuf,
+    },
+    /// Traverse the directory depth-first & iteratively, computing directory
+    /// checksums as soon as possible
     DepthFirst {
         /// Path to the directory to checksum
         dirpath: PathBuf,
     },
-    /// Do an asynchronous directory traversal
+    /// Do an asynchronous directory traversal and build a tree of checksums
     Fastasync {
         /// Set the number of threads for the async runtime to use
         #[clap(short, long, default_value_t = num_cpus::get())]
@@ -46,7 +57,7 @@ enum Command {
         /// Path to the directory to checksum
         dirpath: PathBuf,
     },
-    /// Do a multithreaded directory traversal
+    /// Do a multithreaded directory traversal and build a tree of checksums
     Fastio {
         /// Set the number of threads to use
         #[clap(short, long, default_value_t = num_cpus::get())]
@@ -55,12 +66,13 @@ enum Command {
         /// Path to the directory to checksum
         dirpath: PathBuf,
     },
-    /// Traverse the directory depth-first & recursively
+    /// Traverse & checksum the directory depth-first & recursively
     Recursive {
         /// Path to the directory to checksum
         dirpath: PathBuf,
     },
-    /// Traverse the directory using the 'walkdir' crate
+    /// Traverse the directory using the 'walkdir' crate and build a tree of
+    /// checksums
     Walkdir {
         /// Path to the directory to checksum
         dirpath: PathBuf,
@@ -71,6 +83,7 @@ impl Command {
     fn run(self) -> Result<String, ChecksumError> {
         match self {
             Command::BreadthFirst { dirpath } => breadth_first_checksum(dirpath),
+            Command::Collapsio { threads, dirpath } => collapsio_checksum(dirpath, threads),
             Command::DepthFirst { dirpath } => depth_first_checksum(dirpath),
             Command::Fastasync {
                 threads,

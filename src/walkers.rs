@@ -7,13 +7,16 @@
 //! [`ChecksumTreeError`][crate::errors::ChecksumError].  The latter error type
 //! indicates a bug in the traversal function.
 mod breadth_first;
+mod collapsio;
 mod depth_first;
 mod fastasync;
 mod fastio;
+mod jobstack;
 mod recursive;
 mod util;
 mod walkd;
 pub use breadth_first::*;
+pub use collapsio::*;
 pub use depth_first::*;
 pub use fastasync::*;
 pub use fastio::*;
