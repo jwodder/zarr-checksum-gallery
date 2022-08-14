@@ -56,27 +56,13 @@ impl fmt::Debug for ZarrDirectory {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("ZarrDirectory")
             .field("relpath", &self.relpath)
-            .field(
-                "nodes",
-                &LiteralDebug(format!("<{} nodes>", self.nodes.len())),
-            )
+            .field("nodes", &format_args!("<{} nodes>", self.nodes.len()))
             .field("todo", &self.todo)
             .field(
                 "parent",
-                &self
-                    .parent
-                    .as_ref()
-                    .map(|_| LiteralDebug("<...>".to_string())),
+                &self.parent.as_ref().map(|_| format_args!("<..>")),
             )
             .finish()
-    }
-}
-
-struct LiteralDebug(String);
-
-impl fmt::Debug for LiteralDebug {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.0)
     }
 }
 
