@@ -1,197 +1,125 @@
 //! General operations on Zarrs and their entries
-use crate::errors::{EntryPathError, FSError};
+mod entrypath;
+use crate::errors::{EntryNameError, FSError};
+pub use entrypath::*;
 use std::fmt;
-use std::path::{Component, Path};
+use std::fs;
+use std::path::{Path, PathBuf};
 
-/// A normalized, nonempty, forward-slash-separated UTF-8 encoded relative path
-#[derive(Clone, Eq, Hash, PartialEq)]
-pub struct EntryPath(Vec<String>);
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Zarr {
+    path: PathBuf,
+}
 
-impl EntryPath {
-    /// Return the basename of the path
-    pub fn file_name(&self) -> &str {
-        self.0
-            .last()
-            .expect("Invariant violated: EntryPath is empty")
+impl Zarr {
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Zarr, FSError> {
+        let path = path.as_ref();
+        if !fs::metadata(&path)
+            .map_err(|e| FSError::stat_error(&path, e))?
+            .is_dir()
+        {
+            return Err(FSError::not_dir_root_error(path));
+        }
+        Ok(Zarr { path: path.into() })
     }
 
-    /// Return an iterator over the parent paths of the path, starting at the
-    /// first component and stopping before the file name
-    ///
-    /// ```
-    /// # use zarr_checksum_gallery::zarr::EntryPath;
-    /// let path = EntryPath::try_from("foo/bar/baz").unwrap();
-    /// let mut parents = path.parents();
-    /// assert_eq!(parents.next().unwrap().to_string(), "foo");
-    /// assert_eq!(parents.next().unwrap().to_string(), "foo/bar");
-    /// assert_eq!(parents.next(), None);
-    /// ```
-    pub fn parents(&self) -> Parents<'_> {
-        Parents {
-            parts: &self.0,
-            i: 0,
+    pub fn root_dir(&self) -> ZarrDirectory {
+        ZarrDirectory {
+            path: self.path.clone(),
+            relpath: DirPath::Root,
         }
     }
 }
 
-impl fmt::Debug for EntryPath {
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct ZarrFile {
+    path: PathBuf,
+    relpath: EntryPath,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct ZarrDirectory {
+    path: PathBuf,
+    relpath: DirPath,
+}
+
+impl ZarrDirectory {
+    pub fn entries(&self) -> Result<Vec<ZarrEntry>, FSError> {
+        let mut entries = Vec::new();
+        for p in fs::read_dir(&self.path).map_err(|e| FSError::readdir_error(&self.path, e))? {
+            let p = p.map_err(|e| FSError::readdir_error(&self.path, e))?;
+            let path = p.path();
+            let ftype = p.file_type().map_err(|e| FSError::stat_error(&path, e))?;
+            let is_dir = ftype.is_dir()
+                || (ftype.is_symlink()
+                    && fs::metadata(&path)
+                        .map_err(|e| FSError::stat_error(&path, e))?
+                        .is_dir());
+            let relpath = match p.file_name().to_str() {
+                Some(s) => self
+                    .relpath
+                    .join1(s)
+                    .expect("DirEntry.file_name() should not be . or .. nor contain /"),
+                None => return Err(FSError::undecodable_name_error(path)),
+            };
+            entries.push(if is_dir {
+                ZarrEntry::Directory(ZarrDirectory {
+                    path,
+                    relpath: relpath.into(),
+                })
+            } else {
+                ZarrEntry::File(ZarrFile { path, relpath })
+            })
+        }
+        Ok(entries)
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum ZarrEntry {
+    File(ZarrFile),
+    Directory(ZarrDirectory),
+}
+
+impl From<ZarrFile> for ZarrEntry {
+    fn from(zf: ZarrFile) -> ZarrEntry {
+        ZarrEntry::File(zf)
+    }
+}
+
+impl From<ZarrDirectory> for ZarrEntry {
+    fn from(zd: ZarrDirectory) -> ZarrEntry {
+        ZarrEntry::Directory(zd)
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum DirPath {
+    Root,
+    Path(EntryPath),
+}
+
+impl DirPath {
+    pub fn join1(&self, s: &str) -> Result<EntryPath, EntryNameError> {
+        match self {
+            DirPath::Root if is_path_name(s) => Ok(EntryPath::try_from(s).unwrap()),
+            DirPath::Path(ep) => ep.join1(s),
+            _ => Err(EntryNameError(String::from(s))),
+        }
+    }
+}
+
+impl fmt::Display for DirPath {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("\"")?;
-        for (i, part) in self.0.iter().enumerate() {
-            if i > 0 {
-                f.write_str("/")?;
-            }
-            for c in part.chars() {
-                f.write_str(&c.escape_debug().to_string())?;
-            }
-        }
-        f.write_str("\"")?;
-        Ok(())
-    }
-}
-
-impl fmt::Display for EntryPath {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (i, part) in self.0.iter().enumerate() {
-            if i > 0 {
-                f.write_str("/")?;
-            }
-            f.write_str(part)?;
-        }
-        Ok(())
-    }
-}
-
-impl TryFrom<&Path> for EntryPath {
-    type Error = EntryPathError;
-
-    fn try_from(path: &Path) -> Result<EntryPath, EntryPathError> {
-        let mut output = Vec::new();
-        for c in path.components() {
-            match c {
-                Component::Normal(part) => match part.to_str() {
-                    Some(s) => output.push(String::from(s)),
-                    None => return Err(EntryPathError(path.into())),
-                },
-                Component::CurDir => (),
-                _ => return Err(EntryPathError(path.into())),
-            }
-        }
-        if output.is_empty() {
-            return Err(EntryPathError(path.into()));
-        }
-        Ok(EntryPath(output))
-    }
-}
-
-impl TryFrom<&str> for EntryPath {
-    type Error = EntryPathError;
-
-    fn try_from(path: &str) -> Result<EntryPath, EntryPathError> {
-        Path::new(path).try_into()
-    }
-}
-
-/// Iterator over the parent paths of an [`EntryPath`]
-///
-/// The iterator's items are themselves [`EntryPath`]s.
-///
-/// This struct is returned by [`EntryPath::parents()`].
-pub struct Parents<'a> {
-    parts: &'a Vec<String>,
-    i: usize,
-}
-
-impl<'a> Iterator for Parents<'a> {
-    type Item = EntryPath;
-
-    fn next(&mut self) -> Option<EntryPath> {
-        if self.i + 1 < self.parts.len() {
-            self.i += 1;
-            Some(EntryPath(self.parts[0..self.i].to_vec()))
-        } else {
-            None
+        match self {
+            DirPath::Root => f.write_str("<root>"),
+            DirPath::Path(ep) => <EntryPath as fmt::Display>::fmt(ep, f),
         }
     }
 }
 
-/// Compute `path` relative to `basepath` as an [`EntryPath`]
-pub(crate) fn relative_to<P, Q>(path: P, basepath: Q) -> Result<EntryPath, FSError>
-where
-    P: AsRef<Path>,
-    Q: AsRef<Path>,
-{
-    let path = path.as_ref();
-    let basepath = basepath.as_ref();
-    path.strip_prefix(basepath)
-        .map_err(|_| FSError::relative_path_error(&path, &basepath))?
-        .try_into()
-        .map_err(|_| FSError::relative_path_error(&path, &basepath))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use rstest::rstest;
-    use std::path::PathBuf;
-
-    #[rstest]
-    #[case("foo/bar/baz", "foo/bar", "baz")]
-    #[case("foo/bar/./baz", "foo/bar", "baz")]
-    #[case("foo/bar//baz", "foo/bar", "baz")]
-    #[case("foo/bar/baz/", "foo/bar", "baz")]
-    #[case("foo/bar/baz//", "foo/bar", "baz")]
-    #[case("foo/bar/baz/.", "foo/bar", "baz")]
-    #[case("foo/bar/baz/./quux", "foo/bar", "baz/quux")]
-    #[case("foo/bar/baz/quux/gnusto", "foo/bar", "baz/quux/gnusto")]
-    #[case("foo/bar/baz//quux/gnusto", "foo/bar", "baz/quux/gnusto")]
-    fn test_relative_to(#[case] path: &str, #[case] basepath: &str, #[case] relpath: &str) {
-        assert_eq!(relative_to(path, basepath).unwrap().to_string(), relpath);
-    }
-
-    #[rstest]
-    #[case("baz", "foo/bar")]
-    #[case("/foo/bar/baz", "foo/bar")]
-    #[case("foo/bar/baz", "/foo/bar")]
-    #[case("foo/bar", "foo/bar")]
-    #[case("foo/bar/", "foo/bar")]
-    #[case("foo/bar/.", "foo/bar")]
-    #[case("foo/bar/..", "foo/bar")]
-    #[case("foo/bar/baz/..", "foo/bar")]
-    #[case("foo/bar/../baz", "foo/bar")]
-    fn test_relative_to_invalid(#[case] path: &str, #[case] basepath: &str) {
-        match relative_to(&path, &basepath) {
-            Err(FSError::RelativePathError {
-                path: epath,
-                basepath: ebasepath,
-            }) if PathBuf::from(path) == epath && PathBuf::from(basepath) == ebasepath => (),
-            r => panic!("r = {r:?}"),
-        }
-    }
-
-    #[test]
-    fn test_parents() {
-        let path = EntryPath::try_from("foo/bar/baz").unwrap();
-        let mut parents = path.parents();
-        assert_eq!(parents.next().unwrap().to_string(), "foo");
-        assert_eq!(parents.next().unwrap().to_string(), "foo/bar");
-        assert_eq!(parents.next(), None);
-    }
-
-    #[test]
-    fn test_parents_len_1() {
-        let path = EntryPath::try_from("foo").unwrap();
-        let mut parents = path.parents();
-        assert_eq!(parents.next(), None);
-    }
-
-    #[rstest]
-    #[case("foo", r#""foo""#)]
-    #[case("foo/bar", r#""foo/bar""#)]
-    #[case("foo\n/\tbar", r#""foo\n/\tbar""#)]
-    #[case("foo\x1B—🐐bar", r#""foo\u{1b}—🐐bar""#)]
-    fn test_debug(#[case] path: &str, #[case] repr: &str) {
-        let path = EntryPath::try_from(path).unwrap();
-        assert_eq!(format!("{path:?}"), repr);
+impl From<EntryPath> for DirPath {
+    fn from(ep: EntryPath) -> DirPath {
+        DirPath::Path(ep)
     }
 }

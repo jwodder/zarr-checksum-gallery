@@ -19,6 +19,9 @@ pub enum FSError {
     #[error("Path {path:?} is not a normalized & decodable descendant of {basepath:?}")]
     RelativePathError { path: PathBuf, basepath: PathBuf },
 
+    #[error("Final componenet of path {path:?} is not valid UTF-8")]
+    UndecodableNameError { path: PathBuf },
+
     /// Returned when an error occurs while trying to fetch a path's filesystem
     /// metadata
     #[error("Error stat'ing file: {}: {source}", .path.display())]
@@ -55,6 +58,12 @@ impl FSError {
         FSError::RelativePathError {
             path: path.as_ref().into(),
             basepath: basepath.as_ref().into(),
+        }
+    }
+
+    pub(crate) fn undecodable_name_error<P: AsRef<Path>>(path: P) -> Self {
+        FSError::UndecodableNameError {
+            path: path.as_ref().into(),
         }
     }
 
@@ -121,3 +130,7 @@ pub enum ChecksumError {
 #[derive(Debug, Error)]
 #[error("Invalid, unnormalized, or undecodable relative path: {0:?}")]
 pub struct EntryPathError(pub PathBuf);
+
+#[derive(Debug, Error)]
+#[error("Invalid path name: {0:?}")]
+pub struct EntryNameError(pub String);
