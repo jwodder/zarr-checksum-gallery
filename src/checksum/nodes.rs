@@ -41,6 +41,14 @@ pub struct FileChecksumNode {
 }
 
 impl FileChecksumNode {
+    pub(crate) fn new(relpath: EntryPath, checksum: String, size: u64) -> Self {
+        FileChecksumNode {
+            relpath,
+            checksum,
+            size,
+        }
+    }
+
     /// Compute the checksum for the file `path` within the Zarr at `basepath`
     pub fn for_file<P, Q>(path: P, basepath: Q) -> Result<Self, FSError>
     where

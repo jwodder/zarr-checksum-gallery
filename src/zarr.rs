@@ -1,7 +1,10 @@
 //! General operations on Zarrs and their entries
 mod entrypath;
+use crate::checksum::nodes::*;
 use crate::errors::{EntryNameError, FSError};
+use crate::util::md5_file;
 pub use entrypath::*;
+use log::debug;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -35,6 +38,17 @@ impl Zarr {
 pub struct ZarrFile {
     path: PathBuf,
     relpath: EntryPath,
+}
+
+impl ZarrFile {
+    pub fn into_checksum(self) -> Result<FileChecksumNode, FSError> {
+        let size = fs::metadata(&self.path)
+            .map_err(|e| FSError::stat_error(&self.path, e))?
+            .len();
+        let checksum = md5_file(self.path)?;
+        debug!("Computed checksum for file {}: {checksum}", &self.relpath);
+        Ok(FileChecksumNode::new(self.relpath, checksum, size))
+    }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -72,6 +86,18 @@ impl ZarrDirectory {
             })
         }
         Ok(entries)
+    }
+
+    pub fn get_checksum<I>(&self, nodes: I) -> DirChecksumNode
+    where
+        I: IntoIterator<Item = ZarrChecksumNode>,
+    {
+        let relpath = match &self.relpath {
+            // TODO: Replace this kludgy workaround with something better:
+            DirPath::Root => EntryPath::try_from("<root>").unwrap(),
+            DirPath::Path(ep) => ep.clone(),
+        };
+        get_checksum(relpath, nodes)
     }
 }
 
