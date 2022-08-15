@@ -110,7 +110,7 @@ impl ZarrDirectory {
                     .relpath
                     .join1(s)
                     .expect("DirEntry.file_name() should not be . or .. nor contain /"),
-                None => return Err(FSError::undecodable_name_error(path)),
+                None => return Err(FSError::undecodable_name(path)),
             };
             entries.push(if is_dir {
                 ZarrEntry::Directory(ZarrDirectory {
@@ -157,7 +157,7 @@ impl ZarrDirectory {
                     .relpath
                     .join1(s)
                     .expect("DirEntry.file_name() should not be . or .. nor contain /"),
-                None => return Err(FSError::undecodable_name_error(path)),
+                None => return Err(FSError::undecodable_name(path)),
             };
             entries.push(if is_dir {
                 ZarrEntry::Directory(ZarrDirectory {
@@ -218,7 +218,7 @@ impl Iterator for Entries {
                 .baserelpath
                 .join1(s)
                 .expect("DirEntry.file_name() should not be . or .. nor contain /"),
-            None => return Some(Err(FSError::undecodable_name_error(path))),
+            None => return Some(Err(FSError::undecodable_name(path))),
         };
         Some(Ok(if is_dir {
             ZarrEntry::Directory(ZarrDirectory {

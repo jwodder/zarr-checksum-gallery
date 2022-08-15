@@ -20,7 +20,7 @@ pub enum FSError {
     RelativePathError { path: PathBuf, basepath: PathBuf },
 
     #[error("Final componenet of path {path:?} is not valid UTF-8")]
-    UndecodableNameError { path: PathBuf },
+    UndecodableName { path: PathBuf },
 
     /// Returned when an error occurs while trying to fetch a path's filesystem
     /// metadata
@@ -61,8 +61,8 @@ impl FSError {
         }
     }
 
-    pub(crate) fn undecodable_name_error<P: AsRef<Path>>(path: P) -> Self {
-        FSError::UndecodableNameError {
+    pub(crate) fn undecodable_name<P: AsRef<Path>>(path: P) -> Self {
+        FSError::UndecodableName {
             path: path.as_ref().into(),
         }
     }

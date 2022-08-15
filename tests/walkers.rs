@@ -231,7 +231,7 @@ fn bad_filename() -> Option<TestCase> {
         ChecksumError::FSError(FSError::RelativePathError { path: epath, .. }) => {
             assert_eq!(epath, path);
         }
-        ChecksumError::FSError(FSError::UndecodableNameError { path: epath }) => {
+        ChecksumError::FSError(FSError::UndecodableName { path: epath }) => {
             assert_eq!(epath, path)
         }
         e => panic!("Got unexpected error: {e:?}"),
@@ -259,7 +259,7 @@ fn bad_dirname() -> Option<TestCase> {
         ChecksumError::FSError(FSError::RelativePathError { path: epath, .. }) => {
             assert_eq!(epath, subpath);
         }
-        ChecksumError::FSError(FSError::UndecodableNameError { path: epath }) => {
+        ChecksumError::FSError(FSError::UndecodableName { path: epath }) => {
             assert_eq!(epath, badpath)
         }
         e => panic!("Got unexpected error: {e:?}"),
