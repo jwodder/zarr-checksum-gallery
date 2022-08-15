@@ -117,6 +117,15 @@ impl ZarrDirectory {
         Ok(entries)
     }
 
+    pub fn iter_entries(&self) -> Result<Entries, FSError> {
+        let handle = fs::read_dir(&self.path).map_err(|e| FSError::readdir_error(&self.path, e))?;
+        Ok(Entries {
+            handle,
+            basepath: self.path.clone(),
+            baserelpath: self.relpath.clone(),
+        })
+    }
+
     pub async fn async_entries(&self) -> Result<Vec<ZarrEntry>, FSError> {
         let mut entries = Vec::new();
         let handle = afs::read_dir(&self.path)
@@ -165,6 +174,53 @@ impl ZarrDirectory {
             DirPath::Path(ep) => ep.clone(),
         };
         get_checksum(relpath, nodes)
+    }
+}
+
+pub struct Entries {
+    handle: fs::ReadDir,
+    basepath: PathBuf,
+    baserelpath: DirPath,
+}
+
+impl Iterator for Entries {
+    type Item = Result<ZarrEntry, FSError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let p = match self.handle.next()? {
+            Ok(p) => p,
+            Err(e) => return Some(Err(FSError::readdir_error(&self.basepath, e))),
+        };
+        let path = p.path();
+        let ftype = match p.file_type() {
+            Ok(ft) => ft,
+            Err(e) => return Some(Err(FSError::stat_error(path, e))),
+        };
+        let is_dir = if ftype.is_dir() {
+            true
+        } else if ftype.is_symlink() {
+            match fs::metadata(&path) {
+                Ok(m) => m.is_dir(),
+                Err(e) => return Some(Err(FSError::stat_error(path, e))),
+            }
+        } else {
+            false
+        };
+        let relpath = match p.file_name().to_str() {
+            Some(s) => self
+                .baserelpath
+                .join1(s)
+                .expect("DirEntry.file_name() should not be . or .. nor contain /"),
+            None => return Some(Err(FSError::undecodable_name_error(path))),
+        };
+        Some(Ok(if is_dir {
+            ZarrEntry::Directory(ZarrDirectory {
+                path,
+                relpath: relpath.into(),
+            })
+        } else {
+            ZarrEntry::File(ZarrFile { path, relpath })
+        }))
     }
 }
 

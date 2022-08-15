@@ -1,48 +1,45 @@
 use crate::checksum::nodes::*;
 use crate::errors::{ChecksumError, FSError};
-use crate::zarr::{relative_to, EntryPath};
-use std::fs;
-use std::path::{Path, PathBuf};
+use crate::zarr::*;
+use std::path::Path;
 
 struct OpenDir {
-    handle: fs::ReadDir,
-    path: PathBuf,
-    entries: ZarrDirectory,
+    handle: Entries,
+    entries: Directory,
 }
 
 impl OpenDir {
-    fn new<P: AsRef<Path>>(dirpath: P, relpath: EntryPath) -> Result<OpenDir, FSError> {
-        let handle = fs::read_dir(&dirpath).map_err(|e| FSError::readdir_error(&dirpath, e))?;
+    fn new(dir: ZarrDirectory) -> Result<OpenDir, FSError> {
+        let handle = dir.iter_entries()?;
         Ok(OpenDir {
             handle,
-            path: dirpath.as_ref().into(),
-            entries: ZarrDirectory::new(relpath),
+            entries: Directory::new(dir),
         })
     }
 }
 
-struct ZarrDirectory {
-    relpath: EntryPath,
+struct Directory {
+    dir: ZarrDirectory,
     nodes: Vec<ZarrChecksumNode>,
 }
 
-impl ZarrDirectory {
-    fn new(relpath: EntryPath) -> ZarrDirectory {
-        ZarrDirectory {
-            relpath,
+impl Directory {
+    fn new(dir: ZarrDirectory) -> Directory {
+        Directory {
+            dir,
             nodes: Vec::new(),
         }
     }
 
     fn checksum(self) -> DirChecksumNode {
-        get_checksum(self.relpath, self.nodes)
+        self.dir.get_checksum(self.nodes)
     }
 
     fn add_file(&mut self, node: FileChecksumNode) {
         self.nodes.push(node.into());
     }
 
-    fn add_directory(&mut self, zdir: ZarrDirectory) {
+    fn add_directory(&mut self, zdir: Directory) {
         self.nodes.push(zdir.checksum().into());
     }
 }
@@ -52,29 +49,14 @@ impl ZarrDirectory {
 /// The checksum for each directory is computed as soon as the checksums for
 /// all of its entries are computed.
 pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumError> {
-    let dirpath = PathBuf::from(dirpath.as_ref());
-    let mut dirstack = vec![OpenDir::new(&dirpath, "<root>".try_into().unwrap())?];
+    let zarr = Zarr::new(dirpath)?;
+    let mut dirstack = vec![OpenDir::new(zarr.root_dir())?];
     loop {
         let topdir = dirstack.last_mut().unwrap();
         match topdir.handle.next() {
-            Some(Ok(p)) => {
-                let path = p.path();
-                let ftype = p.file_type().map_err(|e| FSError::stat_error(&path, e))?;
-                let is_dir = ftype.is_dir()
-                    || (ftype.is_symlink()
-                        && fs::metadata(&path)
-                            .map_err(|e| FSError::stat_error(&path, e))?
-                            .is_dir());
-                if is_dir {
-                    let relpath = relative_to(&path, &dirpath)?;
-                    dirstack.push(OpenDir::new(path, relpath)?);
-                } else {
-                    topdir
-                        .entries
-                        .add_file(FileChecksumNode::for_file(path, &dirpath)?);
-                }
-            }
-            Some(Err(e)) => return Err(FSError::readdir_error(&topdir.path, e).into()),
+            Some(Ok(ZarrEntry::Directory(zd))) => dirstack.push(OpenDir::new(zd)?),
+            Some(Ok(ZarrEntry::File(zf))) => topdir.entries.add_file(zf.into_checksum()?),
+            Some(Err(e)) => return Err(e.into()),
             None => {
                 let OpenDir { entries, .. } = dirstack.pop().unwrap();
                 match dirstack.last_mut() {
