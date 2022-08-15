@@ -1,8 +1,7 @@
 use super::jobstack::JobStack;
-use super::util::{listdir, DirEntry};
 use crate::checksum::nodes::*;
 use crate::errors::{ChecksumError, FSError};
-use crate::zarr::{relative_to, EntryPath};
+use crate::zarr::*;
 use log::{error, trace, warn};
 use std::fmt;
 use std::iter::from_fn;
@@ -11,34 +10,42 @@ use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-type ArcDirectory = Arc<Mutex<ZarrDirectory>>;
+type ArcDirectory = Arc<Mutex<Directory>>;
 
 #[derive(Debug)]
 enum Job {
-    Entry(DirEntry, Option<ArcDirectory>),
+    Entry(ZarrEntry, Option<ArcDirectory>),
     CompletedDir(ArcDirectory),
 }
 
-struct ZarrDirectory {
-    relpath: EntryPath,
+struct Directory {
+    dir: ZarrDirectory,
     nodes: Vec<ZarrChecksumNode>,
     todo: usize,
     parent: Option<ArcDirectory>,
 }
 
-impl ZarrDirectory {
-    fn new(relpath: EntryPath, todo: usize, parent: Option<ArcDirectory>) -> ZarrDirectory {
-        trace!("Directory {:?} has {} entries to checksum", relpath, todo);
-        ZarrDirectory {
-            relpath,
+impl Directory {
+    fn new(dir: ZarrDirectory, todo: usize, parent: Option<ArcDirectory>) -> Directory {
+        trace!(
+            "Directory {:?} has {} entries to checksum",
+            dir.relpath(),
+            todo
+        );
+        Directory {
+            dir,
             nodes: Vec::new(),
             todo,
             parent,
         }
     }
 
+    fn relpath(&self) -> &DirPath {
+        self.dir.relpath()
+    }
+
     fn checksum(self) -> DirChecksumNode {
-        get_checksum(self.relpath, self.nodes)
+        self.dir.get_checksum(self.nodes)
     }
 
     fn add(&mut self, node: ZarrChecksumNode) {
@@ -46,16 +53,16 @@ impl ZarrDirectory {
         self.todo = self.todo.saturating_sub(1);
         trace!(
             "Directory {:?} now has {} entries left to checksum",
-            self.relpath,
+            self.relpath(),
             self.todo
         );
     }
 }
 
-impl fmt::Debug for ZarrDirectory {
+impl fmt::Debug for Directory {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("ZarrDirectory")
-            .field("relpath", &self.relpath)
+        f.debug_struct("Directory")
+            .field("dir", &self.dir)
             .field("nodes", &format_args!("<{} nodes>", self.nodes.len()))
             .field("todo", &self.todo)
             .field(
@@ -75,24 +82,20 @@ pub fn collapsio_checksum<P: AsRef<Path>>(
     dirpath: P,
     threads: usize,
 ) -> Result<String, ChecksumError> {
-    let dirpath = dirpath.as_ref();
+    let zarr = Zarr::new(dirpath)?;
     let stack = Arc::new(JobStack::new([Job::Entry(
-        DirEntry {
-            path: dirpath.to_path_buf(),
-            is_dir: true,
-        },
+        ZarrEntry::Directory(zarr.root_dir()),
         None,
     )]));
     let (sender, receiver) = channel();
     for i in 0..threads {
-        let basepath = dirpath.to_path_buf();
         let stack = Arc::clone(&stack);
         let sender = sender.clone();
         thread::spawn(move || {
             trace!("[{i}] Starting thread");
             for entry in from_fn(|| stack.pop()) {
                 trace!("[{i}] Popped {entry:?} from stack");
-                let (to_push, to_send) = process(i, entry, &basepath);
+                let (to_push, to_send) = process(i, entry);
                 stack.job_done();
                 if let Some(v) = to_send {
                     // If we've shut down, don't send anything except Errs
@@ -145,23 +148,12 @@ pub fn collapsio_checksum<P: AsRef<Path>>(
     }
 }
 
-fn process(i: usize, entry: Job, basepath: &Path) -> (Vec<Job>, Option<Result<String, FSError>>) {
+fn process(i: usize, entry: Job) -> (Vec<Job>, Option<Result<String, FSError>>) {
     match entry {
-        Job::Entry(DirEntry { path, is_dir: true }, parent) => match listdir(&path) {
+        Job::Entry(ZarrEntry::Directory(zd), parent) => match zd.entries() {
             Ok(entries) => {
-                let thisdirpath = if path == basepath {
-                    EntryPath::try_from("<root>").unwrap()
-                } else {
-                    match relative_to(&path, &basepath) {
-                        Ok(p) => p,
-                        Err(e) => return (Vec::new(), Some(Err(e))),
-                    }
-                };
-                let arcdir = Arc::new(Mutex::new(ZarrDirectory::new(
-                    thisdirpath.clone(),
-                    entries.len(),
-                    parent,
-                )));
+                let thisdirpath = zd.relpath().clone();
+                let arcdir = Arc::new(Mutex::new(Directory::new(zd, entries.len(), parent)));
                 if entries.is_empty() {
                     trace!("[{i}] Directory {thisdirpath:?} is empty; pushing onto stack");
                     (vec![Job::CompletedDir(arcdir)], None)
@@ -178,14 +170,8 @@ fn process(i: usize, entry: Job, basepath: &Path) -> (Vec<Job>, Option<Result<St
             }
             Err(e) => (Vec::new(), Some(Err(e))),
         },
-        Job::Entry(
-            DirEntry {
-                path,
-                is_dir: false,
-            },
-            parent,
-        ) => {
-            let node = match FileChecksumNode::for_file(&path, &basepath) {
+        Job::Entry(ZarrEntry::File(zf), parent) => {
+            let node = match zf.into_checksum() {
                 Ok(n) => n,
                 Err(e) => return (Vec::new(), Some(Err(e))),
             };
@@ -196,7 +182,7 @@ fn process(i: usize, entry: Job, basepath: &Path) -> (Vec<Job>, Option<Result<St
                 if p.todo == 0 {
                     trace!(
                         "[{i}] Computed all checksums within directory {}; pushing onto stack",
-                        p.relpath
+                        p.relpath()
                     );
                     (vec![Job::CompletedDir(Arc::clone(parent))], None)
                 } else {
@@ -220,7 +206,7 @@ fn process(i: usize, entry: Job, basepath: &Path) -> (Vec<Job>, Option<Result<St
                 if p.todo == 0 {
                     trace!(
                         "[{i}] Computed all checksums within directory {}; pushing onto stack",
-                        p.relpath
+                        p.relpath()
                     );
                     (vec![Job::CompletedDir(Arc::clone(&parent))], None)
                 } else {

@@ -41,6 +41,14 @@ pub struct ZarrFile {
 }
 
 impl ZarrFile {
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn relpath(&self) -> &EntryPath {
+        &self.relpath
+    }
+
     pub fn into_checksum(self) -> Result<FileChecksumNode, FSError> {
         let size = fs::metadata(&self.path)
             .map_err(|e| FSError::stat_error(&self.path, e))?
@@ -58,6 +66,14 @@ pub struct ZarrDirectory {
 }
 
 impl ZarrDirectory {
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn relpath(&self) -> &DirPath {
+        &self.relpath
+    }
+
     pub fn entries(&self) -> Result<Vec<ZarrEntry>, FSError> {
         let mut entries = Vec::new();
         for p in fs::read_dir(&self.path).map_err(|e| FSError::readdir_error(&self.path, e))? {
@@ -120,7 +136,7 @@ impl From<ZarrDirectory> for ZarrEntry {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-enum DirPath {
+pub enum DirPath {
     Root,
     Path(EntryPath),
 }
