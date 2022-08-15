@@ -1,8 +1,9 @@
 use super::jobstack::JobStack;
-use super::util::{listdir, DirEntry};
-use crate::checksum::{compile_checksum, nodes::FileChecksumNode};
+use crate::checksum::compile_checksum;
 use crate::errors::ChecksumError;
+use crate::zarr::*;
 use log::{trace, warn};
+use std::iter::from_fn;
 use std::path::Path;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
@@ -19,22 +20,18 @@ pub fn fastio_checksum<P: AsRef<Path>>(
     dirpath: P,
     threads: usize,
 ) -> Result<String, ChecksumError> {
-    let dirpath = dirpath.as_ref();
-    let stack = Arc::new(JobStack::new([DirEntry {
-        path: dirpath.to_path_buf(),
-        is_dir: true,
-    }]));
+    let zarr = Zarr::new(dirpath)?;
+    let stack = Arc::new(JobStack::new([ZarrEntry::Directory(zarr.root_dir())]));
     let (sender, receiver) = channel();
     for i in 0..threads {
-        let basepath = dirpath.to_path_buf();
         let stack = Arc::clone(&stack);
         let sender = sender.clone();
         thread::spawn(move || {
             trace!("[{i}] Starting thread");
-            for entry in stack.iter() {
-                trace!("[{i}] Popped {:?} from stack", *entry);
-                let output = if entry.is_dir {
-                    match listdir(&entry.path) {
+            for entry in from_fn(|| stack.pop()) {
+                trace!("[{i}] Popped {:?} from stack", entry);
+                let output = match entry {
+                    ZarrEntry::Directory(zd) => match zd.entries() {
                         Ok(entries) => {
                             stack.extend(
                                 entries
@@ -44,10 +41,10 @@ pub fn fastio_checksum<P: AsRef<Path>>(
                             None
                         }
                         Err(e) => Some(Err(e)),
-                    }
-                } else {
-                    Some(FileChecksumNode::for_file(&entry.path, &basepath))
+                    },
+                    ZarrEntry::File(zf) => Some(zf.into_checksum()),
                 };
+                stack.job_done();
                 if let Some(v) = output {
                     // If we've shut down, don't send anything except Errs
                     if v.is_err() || !stack.is_shutdown() {

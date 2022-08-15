@@ -1,5 +1,5 @@
 use log::trace;
-use std::ops::Deref;
+//use std::ops::Deref;
 use std::sync::{Condvar, Mutex};
 
 pub(crate) struct JobStack<T> {
@@ -93,11 +93,14 @@ impl<T> JobStack<T> {
         }
     }
 
+    /*
     pub(crate) fn iter(&self) -> JobStackIterator<'_, T> {
         JobStackIterator { stack: self }
     }
+    */
 }
 
+/*
 pub(crate) struct JobStackIterator<'a, T> {
     stack: &'a JobStack<T>,
 }
@@ -131,3 +134,4 @@ impl<T> Drop for JobStackItem<'_, T> {
         self.stack.job_done();
     }
 }
+*/
