@@ -1,6 +1,6 @@
-use super::util::{async_listdir, DirEntry};
-use crate::checksum::{compile_checksum, nodes::FileChecksumNode};
+use crate::checksum::compile_checksum;
 use crate::errors::ChecksumError;
+use crate::zarr::*;
 use log::{trace, warn};
 use std::path::Path;
 use std::sync::Arc;
@@ -90,7 +90,7 @@ impl<T> AsyncJobStack<T> {
         }
     }
 
-    async fn task_done(&self) {
+    async fn job_done(&self) {
         let mut data = self.data.lock().await;
         data.jobs -= 1;
         trace!("Job count decremented to {}", data.jobs);
@@ -111,22 +111,18 @@ pub async fn fastasync_checksum<P: AsRef<Path>>(
     dirpath: P,
     workers: usize,
 ) -> Result<String, ChecksumError> {
-    let dirpath = dirpath.as_ref();
-    let stack = Arc::new(AsyncJobStack::new([DirEntry {
-        path: dirpath.to_path_buf(),
-        is_dir: true,
-    }]));
+    let zarr = Zarr::new(dirpath)?;
+    let stack = Arc::new(AsyncJobStack::new([ZarrEntry::Directory(zarr.root_dir())]));
     let (sender, mut receiver) = channel(64);
     for i in 0..workers {
-        let basepath = dirpath.to_path_buf();
         let stack = Arc::clone(&stack);
         let sender = sender.clone();
         tokio::spawn(async move {
             trace!("[{i}] Starting worker");
             while let Some(entry) = stack.pop().await {
                 trace!("[{i}] Popped {:?} from stack", entry);
-                let output = if entry.is_dir {
-                    match async_listdir(&entry.path).await {
+                let output = match entry {
+                    ZarrEntry::Directory(zd) => match zd.async_entries().await {
                         Ok(entries) => {
                             stack
                                 .extend(
@@ -138,11 +134,10 @@ pub async fn fastasync_checksum<P: AsRef<Path>>(
                             None
                         }
                         Err(e) => Some(Err(e)),
-                    }
-                } else {
-                    Some(FileChecksumNode::async_for_file(&entry.path, &basepath).await)
+                    },
+                    ZarrEntry::File(zf) => Some(zf.async_into_checksum().await),
                 };
-                stack.task_done().await;
+                stack.job_done().await;
                 if let Some(v) = output {
                     // If we've shut down, don't send anything except Errs
                     if v.is_err() || !stack.is_shutdown().await {

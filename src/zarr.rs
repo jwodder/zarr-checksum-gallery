@@ -2,12 +2,15 @@
 mod entrypath;
 use crate::checksum::nodes::*;
 use crate::errors::{EntryNameError, FSError};
-use crate::util::md5_file;
+use crate::util::{async_md5_file, md5_file};
 pub use entrypath::*;
 use log::debug;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
+use tokio::fs as afs;
+use tokio_stream::wrappers::ReadDirStream;
+use tokio_stream::StreamExt;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Zarr {
@@ -57,6 +60,16 @@ impl ZarrFile {
         debug!("Computed checksum for file {}: {checksum}", &self.relpath);
         Ok(FileChecksumNode::new(self.relpath, checksum, size))
     }
+
+    pub async fn async_into_checksum(self) -> Result<FileChecksumNode, FSError> {
+        let size = afs::metadata(&self.path)
+            .await
+            .map_err(|e| FSError::stat_error(&self.path, e))?
+            .len();
+        let checksum = async_md5_file(self.path).await?;
+        debug!("Computed checksum for file {}: {checksum}", &self.relpath);
+        Ok(FileChecksumNode::new(self.relpath, checksum, size))
+    }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -83,6 +96,44 @@ impl ZarrDirectory {
             let is_dir = ftype.is_dir()
                 || (ftype.is_symlink()
                     && fs::metadata(&path)
+                        .map_err(|e| FSError::stat_error(&path, e))?
+                        .is_dir());
+            let relpath = match p.file_name().to_str() {
+                Some(s) => self
+                    .relpath
+                    .join1(s)
+                    .expect("DirEntry.file_name() should not be . or .. nor contain /"),
+                None => return Err(FSError::undecodable_name_error(path)),
+            };
+            entries.push(if is_dir {
+                ZarrEntry::Directory(ZarrDirectory {
+                    path,
+                    relpath: relpath.into(),
+                })
+            } else {
+                ZarrEntry::File(ZarrFile { path, relpath })
+            })
+        }
+        Ok(entries)
+    }
+
+    pub async fn async_entries(&self) -> Result<Vec<ZarrEntry>, FSError> {
+        let mut entries = Vec::new();
+        let handle = afs::read_dir(&self.path)
+            .await
+            .map_err(|e| FSError::readdir_error(&self.path, e))?;
+        let mut stream = ReadDirStream::new(handle);
+        while let Some(p) = stream.next().await {
+            let p = p.map_err(|e| FSError::readdir_error(&self.path, e))?;
+            let path = p.path();
+            let ftype = p
+                .file_type()
+                .await
+                .map_err(|e| FSError::stat_error(&path, e))?;
+            let is_dir = ftype.is_dir()
+                || (ftype.is_symlink()
+                    && afs::metadata(&path)
+                        .await
                         .map_err(|e| FSError::stat_error(&path, e))?
                         .is_dir());
             let relpath = match p.file_name().to_str() {

@@ -13,7 +13,6 @@ mod fastasync;
 mod fastio;
 mod jobstack;
 mod recursive;
-mod util;
 mod walkd;
 pub use breadth_first::*;
 pub use collapsio::*;
