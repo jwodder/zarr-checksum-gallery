@@ -40,8 +40,8 @@ pub enum FSError {
         source: walkdir::Error,
     },
 
-    /// Returned by [`walkdir_checksum()`][crate::walkdir_checksum] when given
-    /// a path that does not point to a directory
+    /// Returned by a walker when given a path that does not point to a
+    /// directory
     #[error("Root path of traversal is not a directory: {}", .path.display())]
     NotDirRoot { path: PathBuf },
 }
