@@ -257,7 +257,7 @@ fn bad_dirname() -> Option<TestCase> {
     fs::write(&subpath, "This is a file.\n").unwrap();
     let checker = move |e| match e {
         ChecksumError::FSError(FSError::RelativePathError { path: epath, .. }) => {
-            assert!(epath == badpath || epath == subpath, "epath = {epath:?}");
+            assert_eq!(epath, subpath);
         }
         ChecksumError::FSError(FSError::UndecodableNameError { path: epath }) => {
             assert_eq!(epath, badpath)
