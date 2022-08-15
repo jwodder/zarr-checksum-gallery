@@ -1,6 +1,6 @@
-use crate::checksum::{nodes::FileChecksumNode, try_compile_checksum};
+use crate::checksum::try_compile_checksum;
 use crate::errors::{ChecksumError, FSError};
-use std::fs::metadata;
+use crate::zarr::Zarr;
 use std::path::Path;
 use walkdir::WalkDir;
 
@@ -15,14 +15,7 @@ use walkdir::WalkDir;
 /// walkers, which return an [`FSError::ReaddirError`] in such a situation.
 pub fn walkdir_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumError> {
     let dirpath = dirpath.as_ref();
-    // Without this check, walkdir will return only the file `dirpath`, leading
-    // to an empty relative path error
-    if !metadata(&dirpath)
-        .map_err(|e| FSError::stat_error(&dirpath, e))?
-        .is_dir()
-    {
-        return Err(FSError::not_dir_root_error(dirpath).into());
-    }
+    let zarr = Zarr::new(dirpath)?;
     try_compile_checksum(
         WalkDir::new(dirpath)
             .follow_links(true)
@@ -38,7 +31,7 @@ pub fn walkdir_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumEr
             .map(|r| {
                 r.map_or_else(
                     |exc| Err(FSError::walkdir_error(exc)),
-                    |e| FileChecksumNode::for_file(e.path(), dirpath),
+                    |e| zarr.checksum_file(e.path()),
                 )
             }),
     )

@@ -43,7 +43,7 @@ pub enum FSError {
     /// Returned by [`walkdir_checksum()`][crate::walkdir_checksum] when given
     /// a path that does not point to a directory
     #[error("Root path of traversal is not a directory: {}", .path.display())]
-    NotDirRootError { path: PathBuf },
+    NotDirRoot { path: PathBuf },
 }
 
 impl FSError {
@@ -85,8 +85,8 @@ impl FSError {
         e.into()
     }
 
-    pub(crate) fn not_dir_root_error<P: AsRef<Path>>(path: P) -> Self {
-        FSError::NotDirRootError {
+    pub(crate) fn not_dir_root<P: AsRef<Path>>(path: P) -> Self {
+        FSError::NotDirRoot {
             path: path.as_ref().into(),
         }
     }

@@ -24,7 +24,7 @@ impl Zarr {
             .map_err(|e| FSError::stat_error(&path, e))?
             .is_dir()
         {
-            return Err(FSError::not_dir_root_error(path));
+            return Err(FSError::not_dir_root(path));
         }
         Ok(Zarr { path: path.into() })
     }
@@ -34,6 +34,13 @@ impl Zarr {
             path: self.path.clone(),
             relpath: DirPath::Root,
         }
+    }
+
+    pub(crate) fn checksum_file<P: AsRef<Path>>(
+        &self,
+        path: P,
+    ) -> Result<FileChecksumNode, FSError> {
+        FileChecksumNode::for_file(path, &self.path)
     }
 }
 

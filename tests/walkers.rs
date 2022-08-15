@@ -103,10 +103,7 @@ fn file_arg() -> Option<TestCase> {
     let tmpfile = NamedTempFile::new().unwrap();
     let path = tmpfile.path().to_path_buf();
     let checker = move |e| match e {
-        ChecksumError::FSError(FSError::ReaddirError { path: epath, .. }) => {
-            assert_eq!(path, epath)
-        }
-        ChecksumError::FSError(FSError::NotDirRootError { path: epath }) => {
+        ChecksumError::FSError(FSError::NotDirRoot { path: epath }) => {
             assert_eq!(path, epath)
         }
         e => panic!("Got unexpected error: {e:?}"),
