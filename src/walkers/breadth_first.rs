@@ -1,50 +1,44 @@
-use super::util::{listdir, DirEntry};
-use crate::checksum::{nodes::FileChecksumNode, try_compile_checksum};
+use crate::checksum::try_compile_checksum;
 use crate::errors::{ChecksumError, FSError};
+use crate::zarr::*;
 use std::collections::VecDeque;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Traverse & checksum a directory tree breadth-first and iteratively
 ///
 /// This builds an in-memory tree of all file checksums for computing the final
 /// Zarr checksum.
 pub fn breadth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumError> {
-    let dirpath = dirpath.as_ref();
+    let zarr = Zarr::new(dirpath)?;
     try_compile_checksum(
-        BreadthFirstIterator::new(dirpath)
-            .map(|r| r.and_then(|p| FileChecksumNode::for_file(p, dirpath))),
+        BreadthFirstIterator::new(zarr.root_dir()).map(|r| r.and_then(ZarrFile::into_checksum)),
     )
 }
 
 struct BreadthFirstIterator {
-    queue: VecDeque<Result<DirEntry, FSError>>,
+    queue: VecDeque<Result<ZarrEntry, FSError>>,
 }
 
 impl BreadthFirstIterator {
-    fn new<P: AsRef<Path>>(dirpath: P) -> Self {
+    fn new(zd: ZarrDirectory) -> Self {
         BreadthFirstIterator {
-            queue: VecDeque::from([Ok(DirEntry {
-                path: dirpath.as_ref().into(),
-                is_dir: true,
-            })]),
+            queue: VecDeque::from([Ok(zd.into())]),
         }
     }
 }
 
 impl Iterator for BreadthFirstIterator {
-    type Item = Result<PathBuf, FSError>;
+    type Item = Result<ZarrFile, FSError>;
 
-    fn next(&mut self) -> Option<Result<PathBuf, FSError>> {
+    fn next(&mut self) -> Option<Result<ZarrFile, FSError>> {
         loop {
             let entry = self.queue.pop_front()?;
             match entry {
-                Ok(DirEntry {
-                    path, is_dir: true, ..
-                }) => match listdir(path) {
+                Ok(ZarrEntry::Directory(zd)) => match zd.entries() {
                     Ok(entries) => self.queue.extend(entries.into_iter().map(Ok)),
                     Err(e) => self.queue.push_back(Err(e)),
                 },
-                Ok(DirEntry { path, .. }) => return Some(Ok(path)),
+                Ok(ZarrEntry::File(zf)) => return Some(Ok(zf)),
                 Err(e) => return Some(Err(e)),
             }
         }
