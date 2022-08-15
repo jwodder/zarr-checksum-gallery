@@ -1,12 +1,11 @@
 use super::json::get_checksum_json;
 use crate::errors::FSError;
-use crate::util::{async_md5_file, md5_file, md5_string};
+use crate::util::{md5_file, md5_string};
 use crate::zarr::{relative_to, EntryPath};
 use enum_dispatch::enum_dispatch;
 use log::debug;
 use std::fs;
 use std::path::Path;
-use tokio::fs as afs;
 
 /// Trait for behavior shared by [`FileChecksumNode`] and [`DirChecksumNode`]
 #[enum_dispatch]
@@ -50,7 +49,7 @@ impl FileChecksumNode {
     }
 
     /// Compute the checksum for the file `path` within the Zarr at `basepath`
-    pub fn for_file<P, Q>(path: P, basepath: Q) -> Result<Self, FSError>
+    pub(crate) fn for_file<P, Q>(path: P, basepath: Q) -> Result<Self, FSError>
     where
         P: AsRef<Path>,
         Q: AsRef<Path>,
@@ -60,27 +59,6 @@ impl FileChecksumNode {
             .map_err(|e| FSError::stat_error(&path, e))?
             .len();
         let checksum = md5_file(&path)?;
-        debug!("Computed checksum for file {relpath}: {checksum}");
-        Ok(FileChecksumNode {
-            relpath,
-            checksum,
-            size,
-        })
-    }
-
-    /// Asynchronously compute the checksum for the file `path` within the Zarr
-    /// at `basepath`
-    pub async fn async_for_file<P, Q>(path: P, basepath: Q) -> Result<Self, FSError>
-    where
-        P: AsRef<Path>,
-        Q: AsRef<Path>,
-    {
-        let relpath = relative_to(&path, &basepath)?;
-        let size = afs::metadata(&path)
-            .await
-            .map_err(|e| FSError::stat_error(&path, e))?
-            .len();
-        let checksum = async_md5_file(&path).await?;
         debug!("Computed checksum for file {relpath}: {checksum}");
         Ok(FileChecksumNode {
             relpath,
