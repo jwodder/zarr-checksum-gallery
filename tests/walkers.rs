@@ -229,7 +229,10 @@ fn bad_filename() -> Option<TestCase> {
     }
     let checker = move |e| match e {
         ChecksumError::FSError(FSError::RelativePathError { path: epath, .. }) => {
-            assert!(epath == path, "epath = {epath:?}");
+            assert_eq!(epath, path);
+        }
+        ChecksumError::FSError(FSError::UndecodableNameError { path: epath }) => {
+            assert_eq!(epath, path)
         }
         e => panic!("Got unexpected error: {e:?}"),
     };
@@ -255,6 +258,9 @@ fn bad_dirname() -> Option<TestCase> {
     let checker = move |e| match e {
         ChecksumError::FSError(FSError::RelativePathError { path: epath, .. }) => {
             assert!(epath == badpath || epath == subpath, "epath = {epath:?}");
+        }
+        ChecksumError::FSError(FSError::UndecodableNameError { path: epath }) => {
+            assert_eq!(epath, badpath)
         }
         e => panic!("Got unexpected error: {e:?}"),
     };
