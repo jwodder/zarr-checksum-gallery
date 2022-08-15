@@ -1,5 +1,6 @@
+#![allow(dead_code)]
 use log::trace;
-//use std::ops::Deref;
+use std::ops::Deref;
 use std::sync::{Condvar, Mutex};
 
 pub(crate) struct JobStack<T> {
@@ -27,7 +28,6 @@ impl<T> JobStack<T> {
         }
     }
 
-    /*
     pub(crate) fn push(&self, item: T) {
         let mut data = self.data.lock().unwrap();
         if !data.shutdown {
@@ -37,7 +37,6 @@ impl<T> JobStack<T> {
             self.cond.notify_one();
         }
     }
-    */
 
     // We can't impl Extend, as that requires the receiver to be mut
     pub(crate) fn extend<I: IntoIterator<Item = T>>(&self, iter: I) {
@@ -93,14 +92,11 @@ impl<T> JobStack<T> {
         }
     }
 
-    /*
     pub(crate) fn iter(&self) -> JobStackIterator<'_, T> {
         JobStackIterator { stack: self }
     }
-    */
 }
 
-/*
 pub(crate) struct JobStackIterator<'a, T> {
     stack: &'a JobStack<T>,
 }
@@ -134,4 +130,3 @@ impl<T> Drop for JobStackItem<'_, T> {
         self.stack.job_done();
     }
 }
-*/
