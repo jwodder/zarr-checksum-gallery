@@ -1,4 +1,4 @@
-use crate::errors::{EntryNameError, EntryPathError, FSError};
+use crate::errors::{EntryNameError, EntryPathError};
 use std::fmt;
 use std::path::{Component, Path};
 
@@ -122,20 +122,6 @@ impl<'a> Iterator for Parents<'a> {
     }
 }
 
-/// Compute `path` relative to `basepath` as an [`EntryPath`]
-pub(crate) fn relative_to<P, Q>(path: P, basepath: Q) -> Result<EntryPath, FSError>
-where
-    P: AsRef<Path>,
-    Q: AsRef<Path>,
-{
-    let path = path.as_ref();
-    let basepath = basepath.as_ref();
-    path.strip_prefix(basepath)
-        .map_err(|_| FSError::relative_path_error(&path, &basepath))?
-        .try_into()
-        .map_err(|_| FSError::relative_path_error(&path, &basepath))
-}
-
 pub(super) fn is_path_name(s: &str) -> bool {
     !s.is_empty() && s != "." && s != ".." && !s.contains('/')
 }
@@ -145,40 +131,6 @@ mod tests {
     use super::*;
     use rstest::rstest;
     use std::path::PathBuf;
-
-    #[rstest]
-    #[case("foo/bar/baz", "foo/bar", "baz")]
-    #[case("foo/bar/./baz", "foo/bar", "baz")]
-    #[case("foo/bar//baz", "foo/bar", "baz")]
-    #[case("foo/bar/baz/", "foo/bar", "baz")]
-    #[case("foo/bar/baz//", "foo/bar", "baz")]
-    #[case("foo/bar/baz/.", "foo/bar", "baz")]
-    #[case("foo/bar/baz/./quux", "foo/bar", "baz/quux")]
-    #[case("foo/bar/baz/quux/gnusto", "foo/bar", "baz/quux/gnusto")]
-    #[case("foo/bar/baz//quux/gnusto", "foo/bar", "baz/quux/gnusto")]
-    fn test_relative_to(#[case] path: &str, #[case] basepath: &str, #[case] relpath: &str) {
-        assert_eq!(relative_to(path, basepath).unwrap().to_string(), relpath);
-    }
-
-    #[rstest]
-    #[case("baz", "foo/bar")]
-    #[case("/foo/bar/baz", "foo/bar")]
-    #[case("foo/bar/baz", "/foo/bar")]
-    #[case("foo/bar", "foo/bar")]
-    #[case("foo/bar/", "foo/bar")]
-    #[case("foo/bar/.", "foo/bar")]
-    #[case("foo/bar/..", "foo/bar")]
-    #[case("foo/bar/baz/..", "foo/bar")]
-    #[case("foo/bar/../baz", "foo/bar")]
-    fn test_relative_to_invalid(#[case] path: &str, #[case] basepath: &str) {
-        match relative_to(path, basepath) {
-            Err(FSError::RelativePathError {
-                path: epath,
-                basepath: ebasepath,
-            }) if PathBuf::from(path) == epath && PathBuf::from(basepath) == ebasepath => (),
-            r => panic!("r = {r:?}"),
-        }
-    }
 
     #[test]
     fn test_parents() {

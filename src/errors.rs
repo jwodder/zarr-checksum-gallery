@@ -13,12 +13,6 @@ pub enum FSError {
     #[error("Error digesting file: {}: {source}", .path.display())]
     MD5FileError { path: PathBuf, source: io::Error },
 
-    /// Returned when an attempt is made to compute `path` relative to
-    /// `basepath` but the former is not a valid, normalized, UTF-8 decodable
-    /// descendant of the latter
-    #[error("Path {path:?} is not a normalized & decodable descendant of {basepath:?}")]
-    RelativePathError { path: PathBuf, basepath: PathBuf },
-
     #[error("Final componenet of path {path:?} is not valid UTF-8")]
     UndecodableName { path: PathBuf },
 
@@ -32,14 +26,6 @@ pub enum FSError {
     #[error("Error reading directory: {}: {source}", .path.display())]
     ReaddirError { path: PathBuf, source: io::Error },
 
-    /// Returned when an error occurs while walking a directory with [the
-    /// `walkdir` crate](https://crates.io/crates/walkdir)
-    #[error("Error walking directory: {source}")]
-    WalkdirError {
-        #[from]
-        source: walkdir::Error,
-    },
-
     /// Returned by a walker when given a path that does not point to a
     /// directory
     #[error("Root path of traversal is not a directory: {}", .path.display())]
@@ -51,13 +37,6 @@ impl FSError {
         FSError::MD5FileError {
             path: path.as_ref().into(),
             source,
-        }
-    }
-
-    pub(crate) fn relative_path_error<P: AsRef<Path>>(path: P, basepath: P) -> Self {
-        FSError::RelativePathError {
-            path: path.as_ref().into(),
-            basepath: basepath.as_ref().into(),
         }
     }
 
@@ -79,10 +58,6 @@ impl FSError {
             path: path.as_ref().into(),
             source,
         }
-    }
-
-    pub(crate) fn walkdir_error(e: walkdir::Error) -> Self {
-        e.into()
     }
 
     pub(crate) fn not_dir_root<P: AsRef<Path>>(path: P) -> Self {

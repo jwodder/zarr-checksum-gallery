@@ -294,7 +294,6 @@ fn unreadable_dir() -> Option<TestCase> {
             ChecksumError::FSError(FSError::ReaddirError { path: epath, .. }) => {
                 assert_eq!(path, epath)
             }
-            ChecksumError::FSError(FSError::WalkdirError { .. }) => (),
             e => panic!("Got unexpected error: {e:?}"),
         }
     };
@@ -317,9 +316,6 @@ fn bad_filename() -> Option<TestCase> {
         return None;
     }
     let checker = move |e| match e {
-        ChecksumError::FSError(FSError::RelativePathError { path: epath, .. }) => {
-            assert_eq!(epath, path);
-        }
         ChecksumError::FSError(FSError::UndecodableName { path: epath }) => {
             assert_eq!(epath, path)
         }
@@ -343,12 +339,8 @@ fn bad_dirname() -> Option<TestCase> {
         // on such platforms.
         return None;
     }
-    let subpath = badpath.join("somefile");
-    fs::write(&subpath, "This is a file.\n").unwrap();
+    fs::write(badpath.join("somefile"), "This is a file.\n").unwrap();
     let checker = move |e| match e {
-        ChecksumError::FSError(FSError::RelativePathError { path: epath, .. }) => {
-            assert_eq!(epath, subpath);
-        }
         ChecksumError::FSError(FSError::UndecodableName { path: epath }) => {
             assert_eq!(epath, badpath)
         }
@@ -410,14 +402,6 @@ cfg_if! {
         #[template]
         #[apply(base_cases)]
         fn test_cases(#[case] case: TestCase) {}
-    }
-}
-
-#[apply(test_cases)]
-fn test_walkdir_checksum(#[case] case: Option<TestCase>) {
-    if let Some(case) = case {
-        let r = walkdir_checksum(&case.zarr());
-        case.check(r);
     }
 }
 

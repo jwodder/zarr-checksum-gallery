@@ -77,12 +77,6 @@ enum Command {
         /// Path to the directory to checksum
         dirpath: PathBuf,
     },
-    /// Traverse the directory using the 'walkdir' crate and build a tree of
-    /// checksums
-    Walkdir {
-        /// Path to the directory to checksum
-        dirpath: PathBuf,
-    },
 }
 
 impl Arguments {
@@ -138,9 +132,6 @@ impl Arguments {
             ),
             Command::Recursive { dirpath } => {
                 recursive_checksum(&Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles))
-            }
-            Command::Walkdir { dirpath } => {
-                walkdir_checksum(&Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles))
             }
         }
     }

@@ -93,7 +93,3 @@ Implementations
 
 - `recursive` — Walk the directory tree recursively and depth-first, computing
   the checksum for each directory as soon as possible
-
-- `walkdir` — Walk the directory tree using [the `walkdir`
-  crate](https://crates.io/crates/walkdir), building a tree of file checksums
-  in memory

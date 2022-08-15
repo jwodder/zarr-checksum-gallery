@@ -1,11 +1,8 @@
 use super::json::get_checksum_json;
-use crate::errors::FSError;
-use crate::util::{md5_file, md5_string};
-use crate::zarr::{relative_to, EntryPath};
+use crate::util::md5_string;
+use crate::zarr::EntryPath;
 use enum_dispatch::enum_dispatch;
 use log::debug;
-use std::fs;
-use std::path::Path;
 
 /// Trait for behavior shared by [`FileChecksum`] and [`DirChecksum`]
 #[enum_dispatch]
@@ -46,25 +43,6 @@ impl FileChecksum {
             checksum,
             size,
         }
-    }
-
-    /// Compute the checksum for the file `path` within the Zarr at `basepath`
-    pub(crate) fn for_file<P, Q>(path: P, basepath: Q) -> Result<Self, FSError>
-    where
-        P: AsRef<Path>,
-        Q: AsRef<Path>,
-    {
-        let relpath = relative_to(&path, &basepath)?;
-        let size = fs::metadata(&path)
-            .map_err(|e| FSError::stat_error(&path, e))?
-            .len();
-        let checksum = md5_file(&path)?;
-        debug!("Computed checksum for file {relpath}: {checksum}");
-        Ok(FileChecksum {
-            relpath,
-            checksum,
-            size,
-        })
     }
 }
 

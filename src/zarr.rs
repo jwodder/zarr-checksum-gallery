@@ -61,10 +61,6 @@ impl Zarr {
             exclude_dotfiles: self.exclude_dotfiles,
         }
     }
-
-    pub(crate) fn checksum_file<P: AsRef<Path>>(&self, path: P) -> Result<FileChecksum, FSError> {
-        FileChecksum::for_file(path, &self.path)
-    }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

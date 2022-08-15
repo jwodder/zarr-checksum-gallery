@@ -13,5 +13,4 @@ hyperfine \
     -n depth-first "$cmd depth-first $zarr" \
     -n fastasync "$cmd fastasync ${ZARR_ASYNC_THREADS:+--threads $ZARR_ASYNC_THREADS} ${ZARR_WORKERS:+--workers $ZARR_WORKERS} $zarr" \
     -n fastio "$cmd fastio ${ZARR_THREADS:+--threads $ZARR_THREADS} $zarr" \
-    -n recursive "$cmd recursive $zarr" \
-    -n walkdir "$cmd walkdir $zarr"
+    -n recursive "$cmd recursive $zarr"

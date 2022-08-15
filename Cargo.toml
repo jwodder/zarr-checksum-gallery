@@ -21,7 +21,6 @@ thiserror = "1.0.37"
 tokio = { version = "1.21.2", features = ["fs", "macros", "rt", "rt-multi-thread", "sync"] }
 tokio-stream = { version = "0.1.10", features = ["fs"] }
 tokio-util = { version = "0.7.4", features = ["io"] }
-walkdir = "2.3.2"
 
 [dev-dependencies]
 cfg-if = "1.0.0"
