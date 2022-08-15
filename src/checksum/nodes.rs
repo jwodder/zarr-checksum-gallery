@@ -157,7 +157,7 @@ impl ZarrChecksumNode {
 /// entries from the given directory and that no two items in `iter` have the
 /// same [`name`][ChecksumNode::name].  If this condition is not met,
 /// `get_checksum()` will return an inaccurate value.
-pub fn get_checksum<I>(relpath: EntryPath, iter: I) -> DirChecksumNode
+pub(crate) fn get_checksum<I>(relpath: EntryPath, iter: I) -> DirChecksumNode
 where
     I: IntoIterator<Item = ZarrChecksumNode>,
 {

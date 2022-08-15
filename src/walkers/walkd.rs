@@ -9,10 +9,6 @@ use walkdir::WalkDir;
 ///
 /// This builds an in-memory tree of all file checksums for computing the final
 /// Zarr checksum.
-///
-/// If `dirpath` is not a directory, this will return an
-/// [`FSError::NotDirRootError`] immediately.  This is unlike the other
-/// walkers, which return an [`FSError::ReaddirError`] in such a situation.
 pub fn walkdir_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumError> {
     let dirpath = dirpath.as_ref();
     let zarr = Zarr::new(dirpath)?;
