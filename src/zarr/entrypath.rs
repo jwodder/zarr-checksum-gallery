@@ -207,4 +207,16 @@ mod tests {
         let path = EntryPath::try_from(path).unwrap();
         assert_eq!(format!("{path:?}"), repr);
     }
+
+    #[rstest]
+    #[case("foo", "foo")]
+    #[case("foo/bar", "foo/bar")]
+    #[case("foo/.", "foo")]
+    #[case("./foo", "foo")]
+    #[case("foo/./bar", "foo/bar")]
+    #[case("foo/", "foo")]
+    #[case("foo//bar", "foo/bar")]
+    fn test_entrypath_try_from(#[case] path: &str, #[case] displayed: &str) {
+        assert_eq!(EntryPath::try_from(path).unwrap().to_string(), displayed);
+    }
 }
