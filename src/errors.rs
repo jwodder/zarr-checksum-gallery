@@ -94,7 +94,7 @@ impl FSError {
 
 /// Error for failure to construct a
 /// [`ChecksumTree`][crate::checksum::ChecksumTree] due to invalid input
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum ChecksumTreeError {
     /// Returned when a node would be added to a `ChecksumTree` in which a
     /// parent path of the node is already present as a file
@@ -127,10 +127,10 @@ pub enum ChecksumError {
 /// undecodable relative path
 ///
 /// The error contains the invalid path in question as a [`PathBuf`].
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[error("Invalid, unnormalized, or undecodable relative path: {0:?}")]
 pub struct EntryPathError(pub PathBuf);
 
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[error("Invalid path name: {0:?}")]
 pub struct EntryNameError(pub String);
