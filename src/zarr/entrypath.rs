@@ -219,4 +219,21 @@ mod tests {
     fn test_entrypath_try_from(#[case] path: &str, #[case] displayed: &str) {
         assert_eq!(EntryPath::try_from(path).unwrap().to_string(), displayed);
     }
+
+    #[rstest]
+    #[case("")]
+    #[case(".")]
+    #[case("..")]
+    #[case("/")]
+    #[case("/foo")]
+    #[case("foo/..")]
+    #[case("../foo")]
+    #[case("foo/../bar")]
+    #[case("foo/bar/..")]
+    fn test_entrypath_try_from_err(#[case] path: &str) {
+        assert_eq!(
+            EntryPath::try_from(path),
+            Err(EntryPathError(PathBuf::from(path)))
+        );
+    }
 }
