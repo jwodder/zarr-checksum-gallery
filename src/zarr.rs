@@ -1,4 +1,4 @@
-//! General operations on Zarrs and their entries
+//! General operations on Zarrs and the entries within
 mod entrypath;
 use crate::checksum::nodes::*;
 use crate::errors::{EntryNameError, FSError};
@@ -171,6 +171,13 @@ impl ZarrDirectory {
         Ok(entries)
     }
 
+    /// Compute the checksum for the directory from the given checksums for the
+    /// directory's entries.
+    ///
+    /// It is the caller's responsibility to ensure that `nodes` contains all &
+    /// only entries from the directory in question and that no two items in
+    /// `nodes` have the same [`name`][ChecksumNode::name].  If this condition
+    /// is not met, `get_checksum()` will return an inaccurate value.
     pub fn get_checksum<I>(&self, nodes: I) -> DirChecksumNode
     where
         I: IntoIterator<Item = ZarrChecksumNode>,
