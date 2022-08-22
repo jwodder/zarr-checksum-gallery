@@ -170,6 +170,33 @@ fn dir_symlink() -> Option<TestCase> {
     })
 }
 
+fn zarr_symlink() -> Option<TestCase> {
+    let tmp_path = tempdir().unwrap();
+    let opts = dir::CopyOptions {
+        content_only: true,
+        ..dir::CopyOptions::default()
+    };
+    let path = tmp_path.path().join("sample.zarr");
+    dir::copy(SAMPLE_ZARR_PATH, &path, &opts).unwrap();
+    let linkpath = tmp_path.path().join("link.zarr");
+    cfg_if! {
+        if #[cfg(unix)] {
+            symlink("sample.zarr", linkpath).unwrap()
+        } else if #[cfg(windows)] {
+            if symlink_dir("sample.zarr", linkpath).is_err() {
+                // Assume symlinks aren't enabled for us and skip the test
+                return None;
+            }
+        } else {
+            return None;
+        }
+    }
+    Some(TestCase {
+        input: Input::SubTemporary(tmp_path, path),
+        expected: Expected::Checksum(SAMPLE_CHECKSUM),
+    })
+}
+
 #[cfg(unix)]
 fn unreadable_file() -> Option<TestCase> {
     let tmp_path = mksamplecopy();
@@ -299,6 +326,7 @@ fn bad_basedir() -> Option<TestCase> {
 #[case(file_arg())]
 #[case(file_symlink())]
 #[case(dir_symlink())]
+#[case(zarr_symlink())]
 fn base_cases(#[case] case: TestCase) {}
 
 cfg_if! {
