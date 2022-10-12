@@ -36,11 +36,8 @@ impl Zarr {
         }
     }
 
-    pub(crate) fn checksum_file<P: AsRef<Path>>(
-        &self,
-        path: P,
-    ) -> Result<FileChecksumNode, FSError> {
-        FileChecksumNode::for_file(path, &self.path)
+    pub(crate) fn checksum_file<P: AsRef<Path>>(&self, path: P) -> Result<FileChecksum, FSError> {
+        FileChecksum::for_file(path, &self.path)
     }
 }
 
@@ -59,23 +56,23 @@ impl ZarrFile {
         &self.relpath
     }
 
-    pub fn into_checksum(self) -> Result<FileChecksumNode, FSError> {
+    pub fn into_checksum(self) -> Result<FileChecksum, FSError> {
         let size = fs::metadata(&self.path)
             .map_err(|e| FSError::stat_error(&self.path, e))?
             .len();
         let checksum = md5_file(self.path)?;
         debug!("Computed checksum for file {}: {checksum}", &self.relpath);
-        Ok(FileChecksumNode::new(self.relpath, checksum, size))
+        Ok(FileChecksum::new(self.relpath, checksum, size))
     }
 
-    pub async fn async_into_checksum(self) -> Result<FileChecksumNode, FSError> {
+    pub async fn async_into_checksum(self) -> Result<FileChecksum, FSError> {
         let size = afs::metadata(&self.path)
             .await
             .map_err(|e| FSError::stat_error(&self.path, e))?
             .len();
         let checksum = async_md5_file(self.path).await?;
         debug!("Computed checksum for file {}: {checksum}", &self.relpath);
-        Ok(FileChecksumNode::new(self.relpath, checksum, size))
+        Ok(FileChecksum::new(self.relpath, checksum, size))
     }
 }
 
@@ -176,11 +173,11 @@ impl ZarrDirectory {
     ///
     /// It is the caller's responsibility to ensure that `nodes` contains all &
     /// only entries from the directory in question and that no two items in
-    /// `nodes` have the same [`name`][ChecksumNode::name].  If this condition
-    /// is not met, `get_checksum()` will return an inaccurate value.
-    pub fn get_checksum<I>(&self, nodes: I) -> DirChecksumNode
+    /// `nodes` have the same [`name`][Checksum::name].  If this condition is
+    /// not met, `get_checksum()` will return an inaccurate value.
+    pub fn get_checksum<I>(&self, nodes: I) -> DirChecksum
     where
-        I: IntoIterator<Item = ZarrChecksumNode>,
+        I: IntoIterator<Item = EntryChecksum>,
     {
         let relpath = match &self.relpath {
             // TODO: Replace this kludgy workaround with something better:

@@ -20,7 +20,7 @@ impl OpenDir {
 
 struct Directory {
     dir: ZarrDirectory,
-    nodes: Vec<ZarrChecksumNode>,
+    nodes: Vec<EntryChecksum>,
 }
 
 impl Directory {
@@ -31,11 +31,11 @@ impl Directory {
         }
     }
 
-    fn checksum(self) -> DirChecksumNode {
+    fn checksum(self) -> DirChecksum {
         self.dir.get_checksum(self.nodes)
     }
 
-    fn add_file(&mut self, node: FileChecksumNode) {
+    fn add_file(&mut self, node: FileChecksum) {
         self.nodes.push(node.into());
     }
 

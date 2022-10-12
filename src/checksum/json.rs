@@ -1,10 +1,7 @@
 use super::nodes::*;
 use std::fmt::{Error, Write};
 
-pub(super) fn get_checksum_json(
-    files: Vec<FileChecksumNode>,
-    directories: Vec<DirChecksumNode>,
-) -> String {
+pub(super) fn get_checksum_json(files: Vec<FileChecksum>, directories: Vec<DirChecksum>) -> String {
     let mut filevec = files.into_iter().map(JSONEntry::from).collect::<Vec<_>>();
     filevec.sort();
     let mut dirvec = directories
@@ -40,8 +37,8 @@ impl JSONEntry {
     }
 }
 
-impl From<FileChecksumNode> for JSONEntry {
-    fn from(node: FileChecksumNode) -> JSONEntry {
+impl From<FileChecksum> for JSONEntry {
+    fn from(node: FileChecksum) -> JSONEntry {
         JSONEntry {
             name: node.name().to_string(),
             digest: node.checksum,
@@ -50,8 +47,8 @@ impl From<FileChecksumNode> for JSONEntry {
     }
 }
 
-impl From<DirChecksumNode> for JSONEntry {
-    fn from(node: DirChecksumNode) -> JSONEntry {
+impl From<DirChecksum> for JSONEntry {
+    fn from(node: DirChecksum) -> JSONEntry {
         JSONEntry {
             name: node.name().to_string(),
             digest: node.checksum,
@@ -134,18 +131,18 @@ mod test {
     #[test]
     fn test_get_checksum_json() {
         let files = vec![
-            FileChecksumNode {
+            FileChecksum {
                 relpath: "foo".try_into().unwrap(),
                 checksum: "0123456789abcdef0123456789abcdef".into(),
                 size: 69105,
             },
-            FileChecksumNode {
+            FileChecksum {
                 relpath: "bar".try_into().unwrap(),
                 checksum: "abcdef0123456789abcdef0123456789".into(),
                 size: 42,
             },
         ];
-        let directories = Vec::from([DirChecksumNode {
+        let directories = Vec::from([DirChecksum {
             relpath: "quux".try_into().unwrap(),
             checksum: "0987654321fedcba0987654321fedcba-23--65537".into(),
             size: 65537,
@@ -161,7 +158,7 @@ mod test {
     #[test]
     fn test_get_checksum_json_empty_dir() {
         let files = Vec::new();
-        let directories = vec![DirChecksumNode {
+        let directories = vec![DirChecksum {
             relpath: "quux".try_into().unwrap(),
             checksum: "481a2f77ab786a0f45aafd5db0971caa-0--0".into(),
             size: 0,

@@ -20,7 +20,7 @@ enum Job {
 
 struct Directory {
     dir: ZarrDirectory,
-    nodes: Vec<ZarrChecksumNode>,
+    nodes: Vec<EntryChecksum>,
     todo: usize,
     parent: Option<ArcDirectory>,
 }
@@ -44,11 +44,11 @@ impl Directory {
         self.dir.relpath()
     }
 
-    fn checksum(self) -> DirChecksumNode {
+    fn checksum(self) -> DirChecksum {
         self.dir.get_checksum(self.nodes)
     }
 
-    fn add(&mut self, node: ZarrChecksumNode) {
+    fn add(&mut self, node: EntryChecksum) {
         self.nodes.push(node);
         self.todo = self.todo.saturating_sub(1);
         trace!(

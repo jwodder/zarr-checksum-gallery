@@ -3,13 +3,13 @@ use crate::errors::ChecksumTreeError;
 use crate::zarr::EntryPath;
 use std::collections::{hash_map::Entry, HashMap};
 
-/// A tree of [`FileChecksumNode`]s, for computing the final checksum for an
-/// entire Zarr one file at a time
+/// A tree of [`FileChecksum`]s, for computing the final checksum for an entire
+/// Zarr one file at a time
 ///
 /// A `ChecksumTree` can be built up by creating an instance with
-/// [`ChecksumTree::new`] and then adding [`FileChecksumNode`]s one at a time
-/// with [`add_file()`][ChecksumTree::add_file], after which the final checksum
-/// can be retrieved with [`checksum()`][ChecksumTree::checksum] or
+/// [`ChecksumTree::new`] and then adding [`FileChecksum`]s one at a time with
+/// [`add_file()`][ChecksumTree::add_file], after which the final checksum can
+/// be retrieved with [`checksum()`][ChecksumTree::checksum] or
 /// [`into_checksum()`][ChecksumTree::into_checksum].  Alternatively, these
 /// steps can be done all at once by calling [`ChecksumTree::from_files`].
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -23,7 +23,7 @@ struct DirTree {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum TreeNode {
-    File(FileChecksumNode),
+    File(FileChecksum),
     Directory(DirTree),
 }
 
@@ -40,11 +40,11 @@ impl ChecksumTree {
 
     /// Consume the tree and return its Zarr checksum
     pub fn into_checksum(self) -> String {
-        DirChecksumNode::from(self.0).into_checksum()
+        DirChecksum::from(self.0).into_checksum()
     }
 
     /// Add the checksum for a file to the tree
-    pub fn add_file(&mut self, node: FileChecksumNode) -> Result<(), ChecksumTreeError> {
+    pub fn add_file(&mut self, node: FileChecksum) -> Result<(), ChecksumTreeError> {
         let mut d = &mut self.0.children;
         for parent in node.relpath().parents() {
             match d
@@ -67,8 +67,8 @@ impl ChecksumTree {
     }
 
     /// Construct a new `ChecksumTree` from an iterator of
-    /// [`FileChecksumNode`]s
-    pub fn from_files<I: IntoIterator<Item = FileChecksumNode>>(
+    /// [`FileChecksum`]s
+    pub fn from_files<I: IntoIterator<Item = FileChecksum>>(
         iter: I,
     ) -> Result<ChecksumTree, ChecksumTreeError> {
         let mut zarr = ChecksumTree::new();
@@ -93,7 +93,7 @@ impl DirTree {
         }
     }
 
-    fn to_checksum_node(&self) -> DirChecksumNode {
+    fn to_checksum_node(&self) -> DirChecksum {
         get_checksum(
             self.relpath.clone(),
             self.children.values().map(TreeNode::to_checksum_node),
@@ -101,11 +101,11 @@ impl DirTree {
     }
 }
 
-impl From<DirTree> for DirChecksumNode {
-    fn from(dirtree: DirTree) -> DirChecksumNode {
+impl From<DirTree> for DirChecksum {
+    fn from(dirtree: DirTree) -> DirChecksum {
         get_checksum(
             dirtree.relpath,
-            dirtree.children.into_values().map(ZarrChecksumNode::from),
+            dirtree.children.into_values().map(EntryChecksum::from),
         )
     }
 }
@@ -115,7 +115,7 @@ impl TreeNode {
         TreeNode::Directory(DirTree::new(relpath))
     }
 
-    fn to_checksum_node(&self) -> ZarrChecksumNode {
+    fn to_checksum_node(&self) -> EntryChecksum {
         match self {
             TreeNode::File(node) => node.clone().into(),
             TreeNode::Directory(dirtree) => dirtree.to_checksum_node().into(),
@@ -123,11 +123,11 @@ impl TreeNode {
     }
 }
 
-impl From<TreeNode> for ZarrChecksumNode {
-    fn from(node: TreeNode) -> ZarrChecksumNode {
+impl From<TreeNode> for EntryChecksum {
+    fn from(node: TreeNode) -> EntryChecksum {
         match node {
             TreeNode::File(node) => node.into(),
-            TreeNode::Directory(dirtree) => DirChecksumNode::from(dirtree).into(),
+            TreeNode::Directory(dirtree) => DirChecksum::from(dirtree).into(),
         }
     }
 }
@@ -140,35 +140,35 @@ mod test {
     fn test_checksum_tree() {
         let mut sample = ChecksumTree::new();
         sample
-            .add_file(FileChecksumNode {
+            .add_file(FileChecksum {
                 relpath: "arr_0/.zarray".try_into().unwrap(),
                 checksum: "9e30a0a1a465e24220d4132fdd544634".into(),
                 size: 315,
             })
             .unwrap();
         sample
-            .add_file(FileChecksumNode {
+            .add_file(FileChecksum {
                 relpath: "arr_0/0".try_into().unwrap(),
                 checksum: "ed4e934a474f1d2096846c6248f18c00".into(),
                 size: 431,
             })
             .unwrap();
         sample
-            .add_file(FileChecksumNode {
+            .add_file(FileChecksum {
                 relpath: "arr_1/.zarray".try_into().unwrap(),
                 checksum: "9e30a0a1a465e24220d4132fdd544634".into(),
                 size: 315,
             })
             .unwrap();
         sample
-            .add_file(FileChecksumNode {
+            .add_file(FileChecksum {
                 relpath: "arr_1/0".try_into().unwrap(),
                 checksum: "fba4dee03a51bde314e9713b00284a93".into(),
                 size: 431,
             })
             .unwrap();
         sample
-            .add_file(FileChecksumNode {
+            .add_file(FileChecksum {
                 relpath: ".zgroup".try_into().unwrap(),
                 checksum: "e20297935e73dd0154104d4ea53040ab".into(),
                 size: 24,
@@ -183,27 +183,27 @@ mod test {
     #[test]
     fn test_from_files() {
         let files = vec![
-            FileChecksumNode {
+            FileChecksum {
                 relpath: "arr_0/.zarray".try_into().unwrap(),
                 checksum: "9e30a0a1a465e24220d4132fdd544634".into(),
                 size: 315,
             },
-            FileChecksumNode {
+            FileChecksum {
                 relpath: "arr_0/0".try_into().unwrap(),
                 checksum: "ed4e934a474f1d2096846c6248f18c00".into(),
                 size: 431,
             },
-            FileChecksumNode {
+            FileChecksum {
                 relpath: "arr_1/.zarray".try_into().unwrap(),
                 checksum: "9e30a0a1a465e24220d4132fdd544634".into(),
                 size: 315,
             },
-            FileChecksumNode {
+            FileChecksum {
                 relpath: "arr_1/0".try_into().unwrap(),
                 checksum: "fba4dee03a51bde314e9713b00284a93".into(),
                 size: 431,
             },
-            FileChecksumNode {
+            FileChecksum {
                 relpath: ".zgroup".try_into().unwrap(),
                 checksum: "e20297935e73dd0154104d4ea53040ab".into(),
                 size: 24,

@@ -7,9 +7,9 @@ use log::debug;
 use std::fs;
 use std::path::Path;
 
-/// Trait for behavior shared by [`FileChecksumNode`] and [`DirChecksumNode`]
+/// Trait for behavior shared by [`FileChecksum`] and [`DirChecksum`]
 #[enum_dispatch]
-pub trait ChecksumNode {
+pub trait Checksum {
     /// Return the path within the Zarr for which this is a checksum
     fn relpath(&self) -> &EntryPath;
 
@@ -27,21 +27,21 @@ pub trait ChecksumNode {
     fn size(&self) -> u64;
 
     /// Return the number of files within the directory, or 1 for a
-    /// [`FileChecksumNode`]
+    /// [`FileChecksum`]
     fn file_count(&self) -> u64;
 }
 
 /// An MD5 checksum computed for a file in a Zarr directory
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct FileChecksumNode {
+pub struct FileChecksum {
     pub(super) relpath: EntryPath,
     pub(super) checksum: String,
     pub(super) size: u64,
 }
 
-impl FileChecksumNode {
+impl FileChecksum {
     pub(crate) fn new(relpath: EntryPath, checksum: String, size: u64) -> Self {
-        FileChecksumNode {
+        FileChecksum {
             relpath,
             checksum,
             size,
@@ -60,7 +60,7 @@ impl FileChecksumNode {
             .len();
         let checksum = md5_file(&path)?;
         debug!("Computed checksum for file {relpath}: {checksum}");
-        Ok(FileChecksumNode {
+        Ok(FileChecksum {
             relpath,
             checksum,
             size,
@@ -68,7 +68,7 @@ impl FileChecksumNode {
     }
 }
 
-impl ChecksumNode for FileChecksumNode {
+impl Checksum for FileChecksum {
     fn relpath(&self) -> &EntryPath {
         &self.relpath
     }
@@ -96,14 +96,14 @@ impl ChecksumNode for FileChecksumNode {
 
 /// A Zarr checksum computed for a directory inside a Zarr directory
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct DirChecksumNode {
+pub struct DirChecksum {
     pub(super) relpath: EntryPath,
     pub(super) checksum: String,
     pub(super) size: u64,
     pub(super) file_count: u64,
 }
 
-impl ChecksumNode for DirChecksumNode {
+impl Checksum for DirChecksum {
     fn relpath(&self) -> &EntryPath {
         &self.relpath
     }
@@ -129,23 +129,23 @@ impl ChecksumNode for DirChecksumNode {
     }
 }
 
-/// An enum of [`FileChecksumNode`] and [`DirChecksumNode`]
-#[enum_dispatch(ChecksumNode)]
+/// An enum of [`FileChecksum`] and [`DirChecksum`]
+#[enum_dispatch(Checksum)]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum ZarrChecksumNode {
-    File(FileChecksumNode),
-    Directory(DirChecksumNode),
+pub enum EntryChecksum {
+    File(FileChecksum),
+    Directory(DirChecksum),
 }
 
-impl ZarrChecksumNode {
+impl EntryChecksum {
     /// True iff this node represents a directory checksum
     pub fn is_dir(&self) -> bool {
-        matches!(self, ZarrChecksumNode::Directory(_))
+        matches!(self, EntryChecksum::Directory(_))
     }
 
     /// True iff this node represents a file checksum
     pub fn is_file(&self) -> bool {
-        matches!(self, ZarrChecksumNode::File(_))
+        matches!(self, EntryChecksum::File(_))
     }
 }
 
@@ -155,11 +155,11 @@ impl ZarrChecksumNode {
 ///
 /// It is the caller's responsibility to ensure that `iter` contains all & only
 /// entries from the given directory and that no two items in `iter` have the
-/// same [`name`][ChecksumNode::name].  If this condition is not met,
+/// same [`name`][Checksum::name].  If this condition is not met,
 /// `get_checksum()` will return an inaccurate value.
-pub(crate) fn get_checksum<I>(relpath: EntryPath, iter: I) -> DirChecksumNode
+pub(crate) fn get_checksum<I>(relpath: EntryPath, iter: I) -> DirChecksum
 where
-    I: IntoIterator<Item = ZarrChecksumNode>,
+    I: IntoIterator<Item = EntryChecksum>,
 {
     let mut files = Vec::new();
     let mut directories = Vec::new();
@@ -169,14 +169,14 @@ where
         size += node.size();
         file_count += node.file_count();
         match node {
-            ZarrChecksumNode::File(f) => files.push(f),
-            ZarrChecksumNode::Directory(d) => directories.push(d),
+            EntryChecksum::File(f) => files.push(f),
+            EntryChecksum::Directory(d) => directories.push(d),
         }
     }
     let md5 = md5_string(&get_checksum_json(files, directories));
     let checksum = format!("{md5}-{file_count}--{size}");
     debug!("Computed checksum for directory {relpath}: {checksum}");
-    DirChecksumNode {
+    DirChecksum {
         relpath,
         checksum,
         size,
@@ -197,7 +197,7 @@ mod test {
 
     #[test]
     fn test_get_checksum_one_file() {
-        let nodes = vec![ZarrChecksumNode::File(FileChecksumNode {
+        let nodes = vec![EntryChecksum::File(FileChecksum {
             relpath: "bar".try_into().unwrap(),
             checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
             size: 1,
@@ -208,7 +208,7 @@ mod test {
 
     #[test]
     fn test_get_checksum_one_directory() {
-        let nodes = vec![ZarrChecksumNode::Directory(DirChecksumNode {
+        let nodes = vec![EntryChecksum::Directory(DirChecksum {
             relpath: "bar".try_into().unwrap(),
             checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-1--1".into(),
             size: 1,
@@ -221,12 +221,12 @@ mod test {
     #[test]
     fn test_get_checksum_two_files() {
         let nodes = vec![
-            ZarrChecksumNode::File(FileChecksumNode {
+            EntryChecksum::File(FileChecksum {
                 relpath: "bar".try_into().unwrap(),
                 checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
                 size: 1,
             }),
-            ZarrChecksumNode::File(FileChecksumNode {
+            EntryChecksum::File(FileChecksum {
                 relpath: "baz".try_into().unwrap(),
                 checksum: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
                 size: 1,
@@ -239,13 +239,13 @@ mod test {
     #[test]
     fn test_get_checksum_two_directories() {
         let nodes = vec![
-            ZarrChecksumNode::Directory(DirChecksumNode {
+            EntryChecksum::Directory(DirChecksum {
                 relpath: "bar".try_into().unwrap(),
                 checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-1--1".into(),
                 size: 1,
                 file_count: 1,
             }),
-            ZarrChecksumNode::Directory(DirChecksumNode {
+            EntryChecksum::Directory(DirChecksum {
                 relpath: "baz".try_into().unwrap(),
                 checksum: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-1--1".into(),
                 size: 1,
@@ -259,12 +259,12 @@ mod test {
     #[test]
     fn test_get_checksum_one_of_each() {
         let nodes = vec![
-            ZarrChecksumNode::File(FileChecksumNode {
+            EntryChecksum::File(FileChecksum {
                 relpath: "baz".try_into().unwrap(),
                 checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
                 size: 1,
             }),
-            ZarrChecksumNode::Directory(DirChecksumNode {
+            EntryChecksum::Directory(DirChecksum {
                 relpath: "bar".try_into().unwrap(),
                 checksum: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-1--1".into(),
                 size: 1,
