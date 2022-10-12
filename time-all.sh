@@ -1,8 +1,17 @@
 #!/bin/bash
 set -e
-dirpath="${1:?Usage: $0 <dirpath>}"
+
+cmd=target/release/zarr-checksum-gallery
+zarr="${1:?Usage: $0 <zarr>}"
+
 cargo build -r
+
 hyperfine \
-    -L impl breadth-first,collapsio,depth-first,fastasync,fastio,recursive,walkdir \
     -w3 \
-    -n '{impl}' "target/release/zarr-checksum-gallery {impl} $dirpath"
+    -n breadth-first "$cmd breadth-first $zarr" \
+    -n collapsio "$cmd collapsio ${ZARR_THREADS:+--threads $ZARR_THREADS} $zarr" \
+    -n depth-first "$cmd depth-first $zarr" \
+    -n fastasync "$cmd fastasync ${ZARR_ASYNC_THREADS:+--threads $ZARR_ASYNC_THREADS} ${ZARR_WORKERS:+--workers $ZARR_WORKERS} $zarr" \
+    -n fastio "$cmd fastio ${ZARR_THREADS:+--threads $ZARR_THREADS} $zarr" \
+    -n recursive "$cmd recursive $zarr" \
+    -n walkdir "$cmd walkdir $zarr"
