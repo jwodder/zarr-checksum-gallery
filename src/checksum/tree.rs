@@ -51,7 +51,8 @@ impl ChecksumTree {
     /// Add the checksum for a file to the tree
     pub fn add_file(&mut self, node: FileChecksum) -> Result<(), ChecksumTreeError> {
         let mut d = &mut self.0.children;
-        for parent in node.relpath().parents() {
+        let nodepath = node.relpath().clone();
+        for parent in nodepath.parents() {
             match d
                 .entry(parent.file_name().to_string())
                 .or_insert_with(|| TreeNode::directory(parent.clone()))
@@ -62,10 +63,23 @@ impl ChecksumTree {
                 TreeNode::Directory(DirTree { children, .. }) => d = children,
             }
         }
-        match d.entry(node.relpath().file_name().to_string()) {
-            Entry::Occupied(_) => return Err(ChecksumTreeError::DoubleAdd { path: node.relpath }),
+        match d.entry(nodepath.file_name().to_string()) {
+            Entry::Occupied(_) => return Err(ChecksumTreeError::DoubleAdd { path: nodepath }),
             Entry::Vacant(v) => {
                 v.insert(TreeNode::File(node));
+            }
+        }
+        // TODO: Try to merge this into the loop above:
+        let mut dt = &self.0;
+        dt.clear_cache();
+        for parent in nodepath.parents() {
+            match dt.children.get(parent.file_name()) {
+                None => panic!("Directory suddenly disappeared"),
+                Some(TreeNode::File(_)) => panic!("Directory suddenly turned into a File"),
+                Some(TreeNode::Directory(dt2)) => {
+                    dt = dt2;
+                    dt.clear_cache();
+                }
             }
         }
         Ok(())
@@ -111,7 +125,6 @@ impl DirTree {
             .clone()
     }
 
-    #[allow(dead_code)]
     fn clear_cache(&self) {
         _ = self.checksum_cache.borrow_mut().take();
     }
