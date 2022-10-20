@@ -1,6 +1,7 @@
 use super::nodes::*;
 use crate::errors::ChecksumTreeError;
 use crate::zarr::EntryPath;
+use educe::Educe;
 use std::cell::RefCell;
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -16,10 +17,12 @@ use std::collections::{hash_map::Entry, HashMap};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ChecksumTree(DirTree);
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Educe)]
+#[educe(Eq, PartialEq)]
 struct DirTree {
     relpath: EntryPath,
     children: HashMap<String, TreeNode>,
+    #[educe(PartialEq(ignore))]
     checksum_cache: RefCell<Option<DirChecksum>>,
 }
 
@@ -222,5 +225,39 @@ mod test {
             sample.checksum(),
             "4313ab36412db2981c3ed391b38604d6-5--1516"
         );
+    }
+
+    #[test]
+    fn test_dirtree_eq() {
+        let a = DirTree {
+            relpath: "foo/bar/baz".try_into().unwrap(),
+            children: HashMap::from([(
+                "glarch".into(),
+                TreeNode::File(FileChecksum {
+                    relpath: "foo/bar/baz/glarch".try_into().unwrap(),
+                    checksum: "e20297935e73dd0154104d4ea53040ab".into(),
+                    size: 24,
+                }),
+            )]),
+            checksum_cache: RefCell::new(None),
+        };
+        let b = DirTree {
+            relpath: "foo/bar/baz".try_into().unwrap(),
+            children: HashMap::from([(
+                "glarch".into(),
+                TreeNode::File(FileChecksum {
+                    relpath: "foo/bar/baz/glarch".try_into().unwrap(),
+                    checksum: "e20297935e73dd0154104d4ea53040ab".into(),
+                    size: 24,
+                }),
+            )]),
+            checksum_cache: RefCell::new(Some(DirChecksum {
+                relpath: "foo/bar/baz".try_into().unwrap(),
+                checksum: "2606add1822870a6d0f892da6503e720-1--24".into(),
+                size: 24,
+                file_count: 1,
+            })),
+        };
+        assert_eq!(a, b);
     }
 }
