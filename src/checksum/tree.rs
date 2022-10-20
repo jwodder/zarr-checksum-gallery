@@ -1,6 +1,7 @@
 use super::nodes::*;
 use crate::errors::ChecksumTreeError;
 use crate::zarr::EntryPath;
+use std::cell::RefCell;
 use std::collections::{hash_map::Entry, HashMap};
 
 /// A tree of [`FileChecksum`]s, for computing the final checksum for an entire
@@ -19,6 +20,7 @@ pub struct ChecksumTree(DirTree);
 struct DirTree {
     relpath: EntryPath,
     children: HashMap<String, TreeNode>,
+    checksum_cache: RefCell<Option<DirChecksum>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -90,14 +92,20 @@ impl DirTree {
         DirTree {
             relpath,
             children: HashMap::new(),
+            checksum_cache: RefCell::new(None),
         }
     }
 
     fn to_checksum(&self) -> DirChecksum {
-        get_checksum(
-            self.relpath.clone(),
-            self.children.values().map(TreeNode::to_checksum),
-        )
+        self.checksum_cache
+            .borrow_mut()
+            .get_or_insert_with(|| {
+                get_checksum(
+                    self.relpath.clone(),
+                    self.children.values().map(TreeNode::to_checksum),
+                )
+            })
+            .clone()
     }
 }
 
