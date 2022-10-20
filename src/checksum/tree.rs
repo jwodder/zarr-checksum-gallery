@@ -35,7 +35,7 @@ impl ChecksumTree {
 
     /// Compute the Zarr checksum for the entire tree
     pub fn checksum(&self) -> String {
-        self.0.to_checksum_node().into_checksum()
+        self.0.to_checksum().into_checksum()
     }
 
     /// Consume the tree and return its Zarr checksum
@@ -93,10 +93,10 @@ impl DirTree {
         }
     }
 
-    fn to_checksum_node(&self) -> DirChecksum {
+    fn to_checksum(&self) -> DirChecksum {
         get_checksum(
             self.relpath.clone(),
-            self.children.values().map(TreeNode::to_checksum_node),
+            self.children.values().map(TreeNode::to_checksum),
         )
     }
 }
@@ -115,10 +115,10 @@ impl TreeNode {
         TreeNode::Directory(DirTree::new(relpath))
     }
 
-    fn to_checksum_node(&self) -> EntryChecksum {
+    fn to_checksum(&self) -> EntryChecksum {
         match self {
             TreeNode::File(node) => node.clone().into(),
-            TreeNode::Directory(dirtree) => dirtree.to_checksum_node().into(),
+            TreeNode::Directory(dirtree) => dirtree.to_checksum().into(),
         }
     }
 }
