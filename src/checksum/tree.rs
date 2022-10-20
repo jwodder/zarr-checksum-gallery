@@ -110,6 +110,11 @@ impl DirTree {
             })
             .clone()
     }
+
+    #[allow(dead_code)]
+    fn clear_cache(&self) {
+        _ = self.checksum_cache.borrow_mut().take();
+    }
 }
 
 impl From<DirTree> for DirChecksum {
