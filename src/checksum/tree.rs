@@ -132,13 +132,12 @@ impl DirTree {
 
 impl From<DirTree> for DirChecksum {
     fn from(dirtree: DirTree) -> DirChecksum {
-        match dirtree.checksum_cache.take() {
-            Some(c) => c,
-            None => get_checksum(
+        dirtree.checksum_cache.take().unwrap_or_else(|| {
+            get_checksum(
                 dirtree.relpath,
                 dirtree.children.into_values().map(EntryChecksum::from),
-            ),
-        }
+            )
+        })
     }
 }
 
