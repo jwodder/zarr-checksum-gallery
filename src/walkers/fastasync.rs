@@ -3,12 +3,12 @@ use crate::errors::ChecksumError;
 use crate::zarr::*;
 use log::{trace, warn};
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::channel;
-use tokio::sync::{Mutex, Notify};
+use tokio::sync::Notify;
 
-// We need to use Tokio's mutex et alii so that this walker can function in a
-// single-threaded runtime.
+// We need to use Tokio's Notify instead of the standard Condvar so that this
+// walker can function in a single-threaded runtime.
 struct AsyncJobStack<T> {
     data: Mutex<AsyncJobStackData<T>>,
     cond: Notify,
@@ -35,8 +35,8 @@ impl<T> AsyncJobStack<T> {
     }
 
     /*
-    async fn push(&self, item: T) {
-        let mut data = self.data.lock().await;
+    fn push(&self, item: T) {
+        let mut data = self.data.lock().unwrap();
         if !data.shutdown {
             data.queue.push(item);
             data.jobs += 1;
@@ -46,8 +46,8 @@ impl<T> AsyncJobStack<T> {
     }
     */
 
-    async fn extend<I: IntoIterator<Item = T>>(&self, iter: I) {
-        let mut data = self.data.lock().await;
+    fn extend<I: IntoIterator<Item = T>>(&self, iter: I) {
+        let mut data = self.data.lock().unwrap();
         if !data.shutdown {
             let prelen = data.queue.len();
             data.queue.extend(iter);
@@ -57,8 +57,8 @@ impl<T> AsyncJobStack<T> {
         }
     }
 
-    async fn shutdown(&self) {
-        let mut data = self.data.lock().await;
+    fn shutdown(&self) {
+        let mut data = self.data.lock().unwrap();
         if !data.shutdown {
             trace!("Shutting down stack");
             data.jobs -= data.queue.len();
@@ -68,15 +68,15 @@ impl<T> AsyncJobStack<T> {
         }
     }
 
-    async fn is_shutdown(&self) -> bool {
-        self.data.lock().await.shutdown
+    fn is_shutdown(&self) -> bool {
+        self.data.lock().unwrap().shutdown
     }
 
     async fn pop(&self) -> Option<T> {
         loop {
             trace!("Looping through pop()");
             {
-                let mut data = self.data.lock().await;
+                let mut data = self.data.lock().unwrap();
                 if data.jobs == 0 || data.shutdown {
                     trace!("[pop] no jobs; returning None");
                     return None;
@@ -90,8 +90,8 @@ impl<T> AsyncJobStack<T> {
         }
     }
 
-    async fn job_done(&self) {
-        let mut data = self.data.lock().await;
+    fn job_done(&self) {
+        let mut data = self.data.lock().unwrap();
         data.jobs -= 1;
         trace!("Job count decremented to {}", data.jobs);
         if data.jobs == 0 {
@@ -124,32 +124,30 @@ pub async fn fastasync_checksum<P: AsRef<Path>>(
                 let output = match entry {
                     ZarrEntry::Directory(zd) => match zd.async_entries().await {
                         Ok(entries) => {
-                            stack
-                                .extend(
-                                    entries
-                                        .into_iter()
-                                        .inspect(|n| trace!("[{i}] Pushing {n:?} onto stack")),
-                                )
-                                .await;
+                            stack.extend(
+                                entries
+                                    .into_iter()
+                                    .inspect(|n| trace!("[{i}] Pushing {n:?} onto stack")),
+                            );
                             None
                         }
                         Err(e) => Some(Err(e)),
                     },
                     ZarrEntry::File(zf) => Some(zf.async_into_checksum().await),
                 };
-                stack.job_done().await;
+                stack.job_done();
                 if let Some(v) = output {
                     // If we've shut down, don't send anything except Errs
-                    if v.is_err() || !stack.is_shutdown().await {
+                    if v.is_err() || !stack.is_shutdown() {
                         if v.is_err() {
-                            stack.shutdown().await;
+                            stack.shutdown();
                         }
                         trace!("[{i}] Sending {v:?} to output");
                         match sender.send(v).await {
                             Ok(_) => (),
                             Err(_) => {
                                 warn!("[{i}] Failed to send; exiting");
-                                stack.shutdown().await;
+                                stack.shutdown();
                                 return;
                             }
                         }
