@@ -5,6 +5,7 @@ use fs_extra::dir;
 use rstest::rstest;
 use rstest_reuse::{apply, template};
 use std::fs;
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use tempfile::{tempdir, NamedTempFile, TempDir};
 use zarr_checksum_gallery::*;
@@ -373,7 +374,7 @@ fn test_breadth_first_checksum(#[case] case: Option<TestCase>) {
 #[apply(test_cases)]
 fn test_fastio_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let r = fastio_checksum(case.path(), num_cpus::get());
+        let r = fastio_checksum(case.path(), default_jobs());
         case.check(r);
     }
 }
@@ -390,7 +391,7 @@ fn test_depth_first_checksum(#[case] case: Option<TestCase>) {
 #[tokio::test]
 async fn test_fastasync_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let r = fastasync_checksum(case.path(), num_cpus::get()).await;
+        let r = fastasync_checksum(case.path(), default_jobs()).await;
         case.check(r);
     }
 }
@@ -398,7 +399,11 @@ async fn test_fastasync_checksum(#[case] case: Option<TestCase>) {
 #[apply(test_cases)]
 fn test_collapsio_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let r = collapsio_checksum(case.path(), num_cpus::get());
+        let r = collapsio_checksum(case.path(), default_jobs());
         case.check(r);
     }
+}
+
+fn default_jobs() -> NonZeroUsize {
+    NonZeroUsize::new(num_cpus::get().max(1)).unwrap()
 }

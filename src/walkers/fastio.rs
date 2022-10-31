@@ -4,6 +4,7 @@ use crate::errors::ChecksumError;
 use crate::zarr::*;
 use log::{trace, warn};
 use std::iter::from_fn;
+use std::num::NonZeroUsize;
 use std::path::Path;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
@@ -18,12 +19,12 @@ use std::thread;
 /// Zarr checksum.
 pub fn fastio_checksum<P: AsRef<Path>>(
     dirpath: P,
-    threads: usize,
+    threads: NonZeroUsize,
 ) -> Result<String, ChecksumError> {
     let zarr = Zarr::new(dirpath)?;
     let stack = Arc::new(JobStack::new([ZarrEntry::Directory(zarr.root_dir())]));
     let (sender, receiver) = channel();
-    for i in 0..threads {
+    for i in 0..threads.get() {
         let stack = Arc::clone(&stack);
         let sender = sender.clone();
         thread::spawn(move || {

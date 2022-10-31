@@ -5,6 +5,7 @@ use crate::zarr::*;
 use log::{error, trace, warn};
 use std::fmt;
 use std::iter::from_fn;
+use std::num::NonZeroUsize;
 use std::path::Path;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
@@ -80,7 +81,7 @@ impl fmt::Debug for Directory {
 /// The `threads` argument determines the number of worker threads to use.
 pub fn collapsio_checksum<P: AsRef<Path>>(
     dirpath: P,
-    threads: usize,
+    threads: NonZeroUsize,
 ) -> Result<String, ChecksumError> {
     let zarr = Zarr::new(dirpath)?;
     let stack = Arc::new(JobStack::new([Job::Entry(
@@ -88,7 +89,7 @@ pub fn collapsio_checksum<P: AsRef<Path>>(
         None,
     )]));
     let (sender, receiver) = channel();
-    for i in 0..threads {
+    for i in 0..threads.get() {
         let stack = Arc::clone(&stack);
         let sender = sender.clone();
         thread::spawn(move || {

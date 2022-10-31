@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use tokio::runtime::Builder;
@@ -32,8 +33,8 @@ enum Command {
     /// as soon as possible
     Collapsio {
         /// Set the number of threads to use
-        #[clap(short, long, default_value_t = num_cpus::get())]
-        threads: usize,
+        #[clap(short, long, default_value_t = default_jobs())]
+        threads: NonZeroUsize,
 
         /// Path to the directory to checksum
         dirpath: PathBuf,
@@ -51,8 +52,8 @@ enum Command {
         threads: usize,
 
         /// Set the number of worker tasks to use
-        #[clap(short, long, default_value_t = num_cpus::get())]
-        workers: usize,
+        #[clap(short, long, default_value_t = default_jobs())]
+        workers: NonZeroUsize,
 
         /// Path to the directory to checksum
         dirpath: PathBuf,
@@ -60,8 +61,8 @@ enum Command {
     /// Do a multithreaded directory traversal and build a tree of checksums
     Fastio {
         /// Set the number of threads to use
-        #[clap(short, long, default_value_t = num_cpus::get())]
-        threads: usize,
+        #[clap(short, long, default_value_t = default_jobs())]
+        threads: NonZeroUsize,
 
         /// Path to the directory to checksum
         dirpath: PathBuf,
@@ -139,4 +140,8 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+fn default_jobs() -> NonZeroUsize {
+    NonZeroUsize::new(num_cpus::get().max(1)).unwrap()
 }
