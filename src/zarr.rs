@@ -12,6 +12,19 @@ use tokio::fs as afs;
 use tokio_stream::wrappers::ReadDirStream;
 use tokio_stream::StreamExt;
 
+/// Names of files & directories that are excluded from consideration when
+/// traversing a Zarr
+#[allow(dead_code)]
+static EXCLUDED_DOTFILES: &[&str] = &[
+    // This list must be kept in sorted order (enforced by the test
+    // `test_excluded_dotfiles_is_sorted()`)
+    ".dandi",
+    ".datalad",
+    ".git",
+    ".gitattributes",
+    ".gitmodules",
+];
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Zarr {
     path: PathBuf,
@@ -281,5 +294,15 @@ impl fmt::Display for DirPath {
 impl From<EntryPath> for DirPath {
     fn from(ep: EntryPath) -> DirPath {
         DirPath::Path(ep)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_excluded_dotfiles_is_sorted() {
+        assert!(EXCLUDED_DOTFILES.windows(2).all(|ab| ab[0] < ab[1]));
     }
 }
