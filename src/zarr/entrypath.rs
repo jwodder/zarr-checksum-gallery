@@ -173,7 +173,7 @@ mod tests {
     #[case("foo/bar/baz/..", "foo/bar")]
     #[case("foo/bar/../baz", "foo/bar")]
     fn test_relative_to_invalid(#[case] path: &str, #[case] basepath: &str) {
-        match relative_to(&path, &basepath) {
+        match relative_to(path, basepath) {
             Err(FSError::RelativePathError {
                 path: epath,
                 basepath: ebasepath,

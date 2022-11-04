@@ -20,8 +20,8 @@ pub struct Zarr {
 impl Zarr {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Zarr, FSError> {
         let path = path.as_ref();
-        if !fs::metadata(&path)
-            .map_err(|e| FSError::stat_error(&path, e))?
+        if !fs::metadata(path)
+            .map_err(|e| FSError::stat_error(path, e))?
             .is_dir()
         {
             return Err(FSError::not_dir_root(path));
