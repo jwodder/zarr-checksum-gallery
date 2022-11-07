@@ -5,6 +5,7 @@ use crate::errors::{EntryNameError, FSError};
 use crate::util::{async_md5_file, md5_file};
 pub use entrypath::*;
 use log::debug;
+use std::ffi::OsStr;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -297,12 +298,41 @@ impl From<EntryPath> for DirPath {
     }
 }
 
+pub fn is_excluded_dotfile<P: AsRef<Path>>(path: P) -> bool {
+    if let Some(name) = path.as_ref().file_name().and_then(OsStr::to_str) {
+        EXCLUDED_DOTFILES.binary_search(&name).is_ok()
+    } else {
+        false
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+    use rstest::rstest;
 
     #[test]
     fn test_excluded_dotfiles_is_sorted() {
         assert!(EXCLUDED_DOTFILES.windows(2).all(|ab| ab[0] < ab[1]));
+    }
+
+    #[rstest]
+    #[case(".dandi", true)]
+    #[case(".datalad", true)]
+    #[case(".git", true)]
+    #[case(".gitattributes", true)]
+    #[case(".gitmodules", true)]
+    #[case("foo/bar/.dandi", true)]
+    #[case("foo/bar/.datalad", true)]
+    #[case("foo/bar/.git", true)]
+    #[case("foo/bar/.gitattributes", true)]
+    #[case("foo/bar/.gitmodules", true)]
+    #[case(".dandi/foo/bar", false)]
+    #[case(".datalad/foo/bar", false)]
+    #[case(".git/foo/bar", false)]
+    #[case(".gitattributes/foo/bar", false)]
+    #[case(".gitmodules/foo/bar", false)]
+    fn test_is_excluded_dotfile(#[case] path: &str, #[case] b: bool) {
+        assert_eq!(is_excluded_dotfile(path), b);
     }
 }
