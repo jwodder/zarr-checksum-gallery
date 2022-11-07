@@ -28,7 +28,8 @@ static EXCLUDED_DOTFILES: &[&str] = &[
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Zarr {
-    path: PathBuf,
+    pub path: PathBuf,
+    pub exclude_dotfiles: bool,
 }
 
 impl Zarr {
@@ -40,13 +41,24 @@ impl Zarr {
         {
             return Err(FSError::not_dir_root(path));
         }
-        Ok(Zarr { path: path.into() })
+        Ok(Zarr {
+            path: path.into(),
+            exclude_dotfiles: false,
+        })
+    }
+
+    pub fn exclude_dotfiles(self, flag: bool) -> Zarr {
+        Zarr {
+            exclude_dotfiles: flag,
+            ..self
+        }
     }
 
     pub fn root_dir(&self) -> ZarrDirectory {
         ZarrDirectory {
             path: self.path.clone(),
             relpath: DirPath::Root,
+            exclude_dotfiles: self.exclude_dotfiles,
         }
     }
 
@@ -94,6 +106,7 @@ impl ZarrFile {
 pub struct ZarrDirectory {
     path: PathBuf,
     relpath: DirPath,
+    exclude_dotfiles: bool,
 }
 
 impl ZarrDirectory {
@@ -115,6 +128,7 @@ impl ZarrDirectory {
             handle,
             basepath: self.path.clone(),
             baserelpath: self.relpath.clone(),
+            exclude_dotfiles: self.exclude_dotfiles,
         })
     }
 
@@ -127,6 +141,10 @@ impl ZarrDirectory {
         while let Some(p) = stream.next().await {
             let p = p.map_err(|e| FSError::readdir_error(&self.path, e))?;
             let path = p.path();
+            if self.exclude_dotfiles && is_excluded_dotfile(&path) {
+                debug!("Excluding special dotfile {path:?}");
+                continue;
+            }
             let ftype = p
                 .file_type()
                 .await
@@ -148,6 +166,7 @@ impl ZarrDirectory {
                 ZarrEntry::Directory(ZarrDirectory {
                     path,
                     relpath: relpath.into(),
+                    exclude_dotfiles: self.exclude_dotfiles,
                 })
             } else {
                 ZarrEntry::File(ZarrFile { path, relpath })
@@ -180,6 +199,7 @@ pub struct Entries {
     handle: fs::ReadDir,
     basepath: PathBuf,
     baserelpath: DirPath,
+    exclude_dotfiles: bool,
 }
 
 impl Entries {
@@ -202,6 +222,7 @@ impl Entries {
             ZarrEntry::Directory(ZarrDirectory {
                 path,
                 relpath: relpath.into(),
+                exclude_dotfiles: self.exclude_dotfiles,
             })
         } else {
             ZarrEntry::File(ZarrFile { path, relpath })
@@ -213,10 +234,19 @@ impl Iterator for Entries {
     type Item = Result<ZarrEntry, FSError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        Some(match self.handle.next()? {
-            Ok(p) => self.process_direntry(p),
-            Err(e) => Err(FSError::readdir_error(&self.basepath, e)),
-        })
+        loop {
+            return Some(match self.handle.next()? {
+                Ok(p) => {
+                    let path = p.path();
+                    if self.exclude_dotfiles && is_excluded_dotfile(&path) {
+                        debug!("Excluding special dotfile {path:?}");
+                        continue;
+                    }
+                    self.process_direntry(p)
+                }
+                Err(e) => Err(FSError::readdir_error(&self.basepath, e)),
+            });
+        }
     }
 }
 

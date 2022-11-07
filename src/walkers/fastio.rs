@@ -5,23 +5,18 @@ use crate::zarr::*;
 use log::{trace, warn};
 use std::iter::from_fn;
 use std::num::NonZeroUsize;
-use std::path::Path;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::thread;
 
-/// Traverse & checksum a directory using a stack of jobs distributed over
+/// Traverse & checksum a Zarr directory using a stack of jobs distributed over
 /// multiple threads
 ///
 /// The `threads` argument determines the number of worker threads to use.
 ///
 /// This builds an in-memory tree of all file checksums for computing the final
 /// Zarr checksum.
-pub fn fastio_checksum<P: AsRef<Path>>(
-    dirpath: P,
-    threads: NonZeroUsize,
-) -> Result<String, ChecksumError> {
-    let zarr = Zarr::new(dirpath)?;
+pub fn fastio_checksum(zarr: Zarr, threads: NonZeroUsize) -> Result<String, ChecksumError> {
     let stack = Arc::new(JobStack::new([ZarrEntry::Directory(zarr.root_dir())]));
     let (sender, receiver) = channel();
     for i in 0..threads.get() {

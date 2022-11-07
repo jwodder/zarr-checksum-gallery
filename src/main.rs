@@ -3,6 +3,7 @@ use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use tokio::runtime::Builder;
+use zarr_checksum_gallery::zarr::Zarr;
 use zarr_checksum_gallery::*;
 
 /// Compute the Dandi Zarr checksum for a directory
@@ -12,6 +13,10 @@ struct Arguments {
     /// Show DEBUG log messages
     #[clap(long)]
     debug: bool,
+
+    /// Exclude special dotfiles from checksumming
+    #[clap(long)]
+    exclude_dotfiles: bool,
 
     /// Show TRACE log messages
     #[clap(long)]
@@ -81,11 +86,18 @@ enum Command {
 }
 
 impl Command {
-    fn run(self) -> Result<String, ChecksumError> {
+    fn run(self, exclude_dotfiles: bool) -> Result<String, ChecksumError> {
         match self {
-            Command::BreadthFirst { dirpath } => breadth_first_checksum(dirpath),
-            Command::Collapsio { threads, dirpath } => collapsio_checksum(dirpath, threads),
-            Command::DepthFirst { dirpath } => depth_first_checksum(dirpath),
+            Command::BreadthFirst { dirpath } => {
+                breadth_first_checksum(Zarr::new(dirpath)?.exclude_dotfiles(exclude_dotfiles))
+            }
+            Command::Collapsio { threads, dirpath } => collapsio_checksum(
+                Zarr::new(dirpath)?.exclude_dotfiles(exclude_dotfiles),
+                threads,
+            ),
+            Command::DepthFirst { dirpath } => {
+                depth_first_checksum(Zarr::new(dirpath)?.exclude_dotfiles(exclude_dotfiles))
+            }
             Command::Fastasync {
                 threads,
                 workers,
@@ -100,11 +112,21 @@ impl Command {
                 } else {
                     Builder::new_current_thread().enable_all().build().unwrap()
                 };
-                rt.block_on(fastasync_checksum(dirpath, workers))
+                rt.block_on(fastasync_checksum(
+                    Zarr::new(dirpath)?.exclude_dotfiles(exclude_dotfiles),
+                    workers,
+                ))
             }
-            Command::Fastio { threads, dirpath } => fastio_checksum(dirpath, threads),
-            Command::Recursive { dirpath } => recursive_checksum(dirpath),
-            Command::Walkdir { dirpath } => walkdir_checksum(dirpath),
+            Command::Fastio { threads, dirpath } => fastio_checksum(
+                Zarr::new(dirpath)?.exclude_dotfiles(exclude_dotfiles),
+                threads,
+            ),
+            Command::Recursive { dirpath } => {
+                recursive_checksum(Zarr::new(dirpath)?.exclude_dotfiles(exclude_dotfiles))
+            }
+            Command::Walkdir { dirpath } => {
+                walkdir_checksum(Zarr::new(dirpath)?.exclude_dotfiles(exclude_dotfiles))
+            }
         }
     }
 }
@@ -126,7 +148,7 @@ fn main() -> ExitCode {
         .chain(std::io::stderr())
         .apply()
         .unwrap();
-    match args.command.run() {
+    match args.command.run(args.exclude_dotfiles) {
         Ok(checksum) => {
             println!("{}", checksum);
             ExitCode::SUCCESS

@@ -47,6 +47,9 @@ Global Options
 - `--debug` — Show DEBUG log messages listing the checksum for each file &
   directory as it's computed.
 
+- `--exclude-dotfiles` — Exclude the dotfiles & dot-directories `.dandi`,
+  `.datalad`, `.git`, `.gitattributes`, and `.gitmodules` from checksumming
+
 - `--trace` — Show TRACE log messages in addition to DEBUG messages.  Not all
   implementations emit TRACE logs.
 

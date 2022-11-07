@@ -6,7 +6,6 @@ use log::{error, trace, warn};
 use std::fmt;
 use std::iter::from_fn;
 use std::num::NonZeroUsize;
-use std::path::Path;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -74,16 +73,12 @@ impl fmt::Debug for Directory {
     }
 }
 
-/// Traverse & checksum a directory using a stack of jobs distributed over
+/// Traverse & checksum a Zarr directory using a stack of jobs distributed over
 /// multiple threads.  The checksum for each intermediate directory is computed
 /// as a job as soon as possible.
 ///
 /// The `threads` argument determines the number of worker threads to use.
-pub fn collapsio_checksum<P: AsRef<Path>>(
-    dirpath: P,
-    threads: NonZeroUsize,
-) -> Result<String, ChecksumError> {
-    let zarr = Zarr::new(dirpath)?;
+pub fn collapsio_checksum(zarr: Zarr, threads: NonZeroUsize) -> Result<String, ChecksumError> {
     let stack = Arc::new(JobStack::new([Job::Entry(
         ZarrEntry::Directory(zarr.root_dir()),
         None,

@@ -7,7 +7,8 @@ use rstest_reuse::{apply, template};
 use std::fs;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
-use tempfile::{tempdir, NamedTempFile, TempDir};
+use tempfile::{tempdir, TempDir};
+use zarr_checksum_gallery::zarr::Zarr;
 use zarr_checksum_gallery::*;
 
 cfg_if! {
@@ -27,7 +28,7 @@ static SAMPLE_CHECKSUM: &str = "4313ab36412db2981c3ed391b38604d6-5--1516";
 enum Input {
     Permanent(PathBuf),
     Temporary(TempDir),
-    TempFile(NamedTempFile),
+    //TempFile(NamedTempFile),
     SubTemporary(TempDir, PathBuf),
 }
 
@@ -42,12 +43,12 @@ struct TestCase {
 }
 
 impl TestCase {
-    fn path(&self) -> &Path {
+    fn zarr(&self) -> Zarr {
         match &self.input {
-            Input::Permanent(path) => path,
-            Input::Temporary(dir) => dir.path(),
-            Input::TempFile(f) => f.path(),
-            Input::SubTemporary(_, path) => path,
+            Input::Permanent(path) => Zarr::new(path).unwrap(),
+            Input::Temporary(dir) => Zarr::new(dir.path()).unwrap(),
+            //Input::TempFile(f) => Zarr::new(f.path()),
+            Input::SubTemporary(_, path) => Zarr::new(path).unwrap(),
         }
     }
 
@@ -100,6 +101,7 @@ fn empty_dir() -> Option<TestCase> {
     })
 }
 
+/*
 fn file_arg() -> Option<TestCase> {
     let tmpfile = NamedTempFile::new().unwrap();
     let path = tmpfile.path().to_path_buf();
@@ -114,6 +116,7 @@ fn file_arg() -> Option<TestCase> {
         expected: Expected::Error(Box::new(checker)),
     })
 }
+*/
 
 fn file_symlink() -> Option<TestCase> {
     let tmp_path = tempdir().unwrap();
@@ -324,7 +327,7 @@ fn bad_basedir() -> Option<TestCase> {
 #[case(sample1())]
 #[case(sample2())]
 #[case(empty_dir())]
-#[case(file_arg())]
+//#[case(file_arg())]
 #[case(file_symlink())]
 #[case(dir_symlink())]
 #[case(zarr_symlink())]
@@ -350,7 +353,7 @@ cfg_if! {
 #[apply(test_cases)]
 fn test_walkdir_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let r = walkdir_checksum(case.path());
+        let r = walkdir_checksum(case.zarr());
         case.check(r);
     }
 }
@@ -358,7 +361,7 @@ fn test_walkdir_checksum(#[case] case: Option<TestCase>) {
 #[apply(test_cases)]
 fn test_recursive_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let r = recursive_checksum(case.path());
+        let r = recursive_checksum(case.zarr());
         case.check(r);
     }
 }
@@ -366,7 +369,7 @@ fn test_recursive_checksum(#[case] case: Option<TestCase>) {
 #[apply(test_cases)]
 fn test_breadth_first_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let r = breadth_first_checksum(case.path());
+        let r = breadth_first_checksum(case.zarr());
         case.check(r);
     }
 }
@@ -374,7 +377,7 @@ fn test_breadth_first_checksum(#[case] case: Option<TestCase>) {
 #[apply(test_cases)]
 fn test_fastio_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let r = fastio_checksum(case.path(), default_jobs());
+        let r = fastio_checksum(case.zarr(), default_jobs());
         case.check(r);
     }
 }
@@ -382,7 +385,7 @@ fn test_fastio_checksum(#[case] case: Option<TestCase>) {
 #[apply(test_cases)]
 fn test_depth_first_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let r = depth_first_checksum(case.path());
+        let r = depth_first_checksum(case.zarr());
         case.check(r);
     }
 }
@@ -391,7 +394,7 @@ fn test_depth_first_checksum(#[case] case: Option<TestCase>) {
 #[tokio::test]
 async fn test_fastasync_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let r = fastasync_checksum(case.path(), default_jobs()).await;
+        let r = fastasync_checksum(case.zarr(), default_jobs()).await;
         case.check(r);
     }
 }
@@ -399,7 +402,7 @@ async fn test_fastasync_checksum(#[case] case: Option<TestCase>) {
 #[apply(test_cases)]
 fn test_collapsio_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let r = collapsio_checksum(case.path(), default_jobs());
+        let r = collapsio_checksum(case.zarr(), default_jobs());
         case.check(r);
     }
 }

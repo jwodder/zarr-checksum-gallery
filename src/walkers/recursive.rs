@@ -1,14 +1,12 @@
 use crate::checksum::nodes::*;
 use crate::errors::{ChecksumError, FSError};
 use crate::zarr::*;
-use std::path::Path;
 
-/// Traverse & checksum a directory tree recursively
+/// Traverse & checksum a Zarr directory tree recursively
 ///
 /// The checksum for each directory is computed as soon as the checksums for
 /// all of its entries are computed.
-pub fn recursive_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumError> {
-    let zarr = Zarr::new(dirpath)?;
+pub fn recursive_checksum(zarr: Zarr) -> Result<String, ChecksumError> {
     Ok(recurse(zarr.root_dir())?.into_checksum())
 }
 

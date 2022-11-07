@@ -3,7 +3,6 @@ use crate::errors::ChecksumError;
 use crate::zarr::*;
 use log::{trace, warn};
 use std::num::NonZeroUsize;
-use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::channel;
 use tokio::sync::Notify;
@@ -101,18 +100,17 @@ impl<T> AsyncJobStack<T> {
     }
 }
 
-/// Asynchronously traverse & checksum a directory using a stack of jobs
+/// Asynchronously traverse & checksum a Zarr directory using a stack of jobs
 /// distributed over multiple worker tasks
 ///
 /// The `workers` argument determines the number of worker tasks to use.
 ///
 /// This builds an in-memory tree of all file checksums for computing the final
 /// Zarr checksum.
-pub async fn fastasync_checksum<P: AsRef<Path>>(
-    dirpath: P,
+pub async fn fastasync_checksum(
+    zarr: Zarr,
     workers: NonZeroUsize,
 ) -> Result<String, ChecksumError> {
-    let zarr = Zarr::new(dirpath)?;
     let stack = Arc::new(AsyncJobStack::new([ZarrEntry::Directory(zarr.root_dir())]));
     let (sender, mut receiver) = channel(64);
     for i in 0..workers.get() {

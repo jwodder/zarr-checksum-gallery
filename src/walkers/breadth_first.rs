@@ -2,14 +2,12 @@ use crate::checksum::try_compile_checksum;
 use crate::errors::{ChecksumError, FSError};
 use crate::zarr::*;
 use std::collections::VecDeque;
-use std::path::Path;
 
-/// Traverse & checksum a directory tree breadth-first and iteratively
+/// Traverse & checksum a Zarr directory breadth-first and iteratively
 ///
 /// This builds an in-memory tree of all file checksums for computing the final
 /// Zarr checksum.
-pub fn breadth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumError> {
-    let zarr = Zarr::new(dirpath)?;
+pub fn breadth_first_checksum(zarr: Zarr) -> Result<String, ChecksumError> {
     try_compile_checksum(
         BreadthFirstIterator::new(zarr.root_dir()).map(|r| r.and_then(ZarrFile::into_checksum)),
     )

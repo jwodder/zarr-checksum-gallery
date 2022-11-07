@@ -1,7 +1,6 @@
 use crate::checksum::nodes::*;
 use crate::errors::{ChecksumError, FSError};
 use crate::zarr::*;
-use std::path::Path;
 
 struct OpenDir {
     handle: Entries,
@@ -44,12 +43,11 @@ impl Directory {
     }
 }
 
-/// Traverse & checksum a directory tree depth-first and iteratively
+/// Traverse & checksum a Zarr directory tree depth-first and iteratively
 ///
 /// The checksum for each directory is computed as soon as the checksums for
 /// all of its entries are computed.
-pub fn depth_first_checksum<P: AsRef<Path>>(dirpath: P) -> Result<String, ChecksumError> {
-    let zarr = Zarr::new(dirpath)?;
+pub fn depth_first_checksum(zarr: Zarr) -> Result<String, ChecksumError> {
     let mut dirstack = vec![OpenDir::new(zarr.root_dir())?];
     loop {
         let topdir = dirstack.last_mut().unwrap();
