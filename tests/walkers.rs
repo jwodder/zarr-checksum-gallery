@@ -40,15 +40,22 @@ enum Expected {
 struct TestCase {
     input: Input,
     expected: Expected,
+    exclude_dotfiles: bool,
 }
 
 impl TestCase {
     fn zarr(&self) -> Zarr {
         match &self.input {
-            Input::Permanent(path) => Zarr::new(path).unwrap(),
-            Input::Temporary(dir) => Zarr::new(dir.path()).unwrap(),
-            //Input::TempFile(f) => Zarr::new(f.path()),
-            Input::SubTemporary(_, path) => Zarr::new(path).unwrap(),
+            Input::Permanent(path) => Zarr::new(path)
+                .unwrap()
+                .exclude_dotfiles(self.exclude_dotfiles),
+            Input::Temporary(dir) => Zarr::new(dir.path())
+                .unwrap()
+                .exclude_dotfiles(self.exclude_dotfiles),
+            //Input::TempFile(f) => Zarr::new(f.path()).exclude_dotfiles(self.exclude_dotfiles),
+            Input::SubTemporary(_, path) => Zarr::new(path)
+                .unwrap()
+                .exclude_dotfiles(self.exclude_dotfiles),
         }
     }
 
@@ -66,6 +73,7 @@ fn sample1() -> Option<TestCase> {
     Some(TestCase {
         input: Input::Permanent(SAMPLE_ZARR_PATH.into()),
         expected: Expected::Checksum(SAMPLE_CHECKSUM),
+        exclude_dotfiles: false,
     })
 }
 
@@ -91,6 +99,7 @@ fn sample2() -> Option<TestCase> {
     Some(TestCase {
         input: Input::Temporary(tmp_path),
         expected: Expected::Checksum(SAMPLE_CHECKSUM),
+        exclude_dotfiles: false,
     })
 }
 
@@ -98,6 +107,7 @@ fn empty_dir() -> Option<TestCase> {
     Some(TestCase {
         input: Input::Temporary(tempdir().unwrap()),
         expected: Expected::Checksum("481a2f77ab786a0f45aafd5db0971caa-0--0"),
+        exclude_dotfiles: false,
     })
 }
 
@@ -114,6 +124,7 @@ fn file_arg() -> Option<TestCase> {
     Some(TestCase {
         input: Input::TempFile(tmpfile),
         expected: Expected::Error(Box::new(checker)),
+        exclude_dotfiles: false,
     })
 }
 */
@@ -143,6 +154,7 @@ fn file_symlink() -> Option<TestCase> {
     Some(TestCase {
         input: Input::SubTemporary(tmp_path, path),
         expected: Expected::Checksum(SAMPLE_CHECKSUM),
+        exclude_dotfiles: false,
     })
 }
 
@@ -171,6 +183,7 @@ fn dir_symlink() -> Option<TestCase> {
     Some(TestCase {
         input: Input::SubTemporary(tmp_path, path),
         expected: Expected::Checksum(SAMPLE_CHECKSUM),
+        exclude_dotfiles: false,
     })
 }
 
@@ -198,6 +211,49 @@ fn zarr_symlink() -> Option<TestCase> {
     Some(TestCase {
         input: Input::SubTemporary(tmp_path, path),
         expected: Expected::Checksum(SAMPLE_CHECKSUM),
+        exclude_dotfiles: false,
+    })
+}
+
+fn excluded_dotfiles() -> Option<TestCase> {
+    let tmp_path = mksamplecopy();
+    let path = tmp_path.path();
+    fs::write(path.join(".git"), "gitdir: foo/bar\n").unwrap();
+    fs::create_dir(path.join(".dandi")).unwrap();
+    fs::write(path.join(".dandi").join("somefile.txt"), "Hello world!\n").unwrap();
+    fs::write(path.join(".gitattributes"), "* eol=lf\n").unwrap();
+    fs::write(path.join("arr_0").join(".gitmodules"), "# Empty\n").unwrap();
+    fs::create_dir(path.join("arr_1").join(".datalad")).unwrap();
+    fs::write(
+        path.join("arr_1").join(".datalad").join("config"),
+        "# Empty\n",
+    )
+    .unwrap();
+    Some(TestCase {
+        input: Input::Temporary(tmp_path),
+        expected: Expected::Checksum(SAMPLE_CHECKSUM),
+        exclude_dotfiles: true,
+    })
+}
+
+fn unexcluded_dotfiles() -> Option<TestCase> {
+    let tmp_path = mksamplecopy();
+    let path = tmp_path.path();
+    fs::write(path.join(".git"), "gitdir: foo/bar\n").unwrap();
+    fs::create_dir(path.join(".dandi")).unwrap();
+    fs::write(path.join(".dandi").join("somefile.txt"), "Hello world!\n").unwrap();
+    fs::write(path.join(".gitattributes"), "* eol=lf\n").unwrap();
+    fs::write(path.join("arr_0").join(".gitmodules"), "# Empty\n").unwrap();
+    fs::create_dir(path.join("arr_1").join(".datalad")).unwrap();
+    fs::write(
+        path.join("arr_1").join(".datalad").join("config"),
+        "# Empty\n",
+    )
+    .unwrap();
+    Some(TestCase {
+        input: Input::Temporary(tmp_path),
+        expected: Expected::Checksum("affe15acbc00d048debc9ba4f3834577-10--1570"),
+        exclude_dotfiles: false,
     })
 }
 
@@ -218,6 +274,7 @@ fn unreadable_file() -> Option<TestCase> {
     Some(TestCase {
         input: Input::Temporary(tmp_path),
         expected: Expected::Error(Box::new(checker)),
+        exclude_dotfiles: false,
     })
 }
 
@@ -244,6 +301,7 @@ fn unreadable_dir() -> Option<TestCase> {
     Some(TestCase {
         input: Input::Temporary(tmp_path),
         expected: Expected::Error(Box::new(checker)),
+        exclude_dotfiles: false,
     })
 }
 
@@ -270,6 +328,7 @@ fn bad_filename() -> Option<TestCase> {
     Some(TestCase {
         input: Input::Temporary(tmp_path),
         expected: Expected::Error(Box::new(checker)),
+        exclude_dotfiles: false,
     })
 }
 
@@ -298,6 +357,7 @@ fn bad_dirname() -> Option<TestCase> {
     Some(TestCase {
         input: Input::Temporary(tmp_path),
         expected: Expected::Error(Box::new(checker)),
+        exclude_dotfiles: false,
     })
 }
 
@@ -319,6 +379,7 @@ fn bad_basedir() -> Option<TestCase> {
     Some(TestCase {
         input: Input::SubTemporary(tmp_path, path),
         expected: Expected::Checksum(SAMPLE_CHECKSUM),
+        exclude_dotfiles: false,
     })
 }
 
@@ -331,6 +392,8 @@ fn bad_basedir() -> Option<TestCase> {
 #[case(file_symlink())]
 #[case(dir_symlink())]
 #[case(zarr_symlink())]
+#[case(excluded_dotfiles())]
+#[case(unexcluded_dotfiles())]
 fn base_cases(#[case] case: TestCase) {}
 
 cfg_if! {
