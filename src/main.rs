@@ -85,18 +85,33 @@ enum Command {
     },
 }
 
-impl Command {
-    fn run(self, exclude_dotfiles: bool) -> Result<String, ChecksumError> {
-        match self {
+impl Arguments {
+    fn run(self) -> Result<String, ChecksumError> {
+        let log_level = if self.trace {
+            log::LevelFilter::Trace
+        } else if self.debug {
+            log::LevelFilter::Debug
+        } else {
+            log::LevelFilter::Warn
+        };
+        fern::Dispatch::new()
+            .format(|out, message, record| {
+                out.finish(format_args!("[{:<5}] {}", record.level(), message))
+            })
+            .level(log_level)
+            .chain(std::io::stderr())
+            .apply()
+            .unwrap();
+        match self.command {
             Command::BreadthFirst { dirpath } => {
-                breadth_first_checksum(Zarr::new(dirpath)?.exclude_dotfiles(exclude_dotfiles))
+                breadth_first_checksum(Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles))
             }
             Command::Collapsio { threads, dirpath } => collapsio_checksum(
-                Zarr::new(dirpath)?.exclude_dotfiles(exclude_dotfiles),
+                Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles),
                 threads,
             ),
             Command::DepthFirst { dirpath } => {
-                depth_first_checksum(Zarr::new(dirpath)?.exclude_dotfiles(exclude_dotfiles))
+                depth_first_checksum(Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles))
             }
             Command::Fastasync {
                 threads,
@@ -113,42 +128,26 @@ impl Command {
                     Builder::new_current_thread().enable_all().build().unwrap()
                 };
                 rt.block_on(fastasync_checksum(
-                    Zarr::new(dirpath)?.exclude_dotfiles(exclude_dotfiles),
+                    Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles),
                     workers,
                 ))
             }
             Command::Fastio { threads, dirpath } => fastio_checksum(
-                Zarr::new(dirpath)?.exclude_dotfiles(exclude_dotfiles),
+                Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles),
                 threads,
             ),
             Command::Recursive { dirpath } => {
-                recursive_checksum(Zarr::new(dirpath)?.exclude_dotfiles(exclude_dotfiles))
+                recursive_checksum(Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles))
             }
             Command::Walkdir { dirpath } => {
-                walkdir_checksum(Zarr::new(dirpath)?.exclude_dotfiles(exclude_dotfiles))
+                walkdir_checksum(Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles))
             }
         }
     }
 }
 
 fn main() -> ExitCode {
-    let args = Arguments::parse();
-    let log_level = if args.trace {
-        log::LevelFilter::Trace
-    } else if args.debug {
-        log::LevelFilter::Debug
-    } else {
-        log::LevelFilter::Warn
-    };
-    fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!("[{:<5}] {}", record.level(), message))
-        })
-        .level(log_level)
-        .chain(std::io::stderr())
-        .apply()
-        .unwrap();
-    match args.command.run(args.exclude_dotfiles) {
+    match Arguments::parse().run() {
         Ok(checksum) => {
             println!("{}", checksum);
             ExitCode::SUCCESS
