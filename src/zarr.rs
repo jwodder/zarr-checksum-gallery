@@ -182,44 +182,41 @@ pub struct Entries {
     baserelpath: DirPath,
 }
 
-impl Iterator for Entries {
-    type Item = Result<ZarrEntry, FSError>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let p = match self.handle.next()? {
-            Ok(p) => p,
-            Err(e) => return Some(Err(FSError::readdir_error(&self.basepath, e))),
-        };
+impl Entries {
+    fn process_direntry(&self, p: fs::DirEntry) -> Result<ZarrEntry, FSError> {
         let path = p.path();
-        let ftype = match p.file_type() {
-            Ok(ft) => ft,
-            Err(e) => return Some(Err(FSError::stat_error(path, e))),
-        };
-        let is_dir = if ftype.is_dir() {
-            true
-        } else if ftype.is_symlink() {
-            match fs::metadata(&path) {
-                Ok(m) => m.is_dir(),
-                Err(e) => return Some(Err(FSError::stat_error(path, e))),
-            }
-        } else {
-            false
-        };
+        let ftype = p.file_type().map_err(|e| FSError::stat_error(&path, e))?;
+        let is_dir = ftype.is_dir()
+            || (ftype.is_symlink()
+                && fs::metadata(&path)
+                    .map_err(|e| FSError::stat_error(&path, e))?
+                    .is_dir());
         let relpath = match p.file_name().to_str() {
             Some(s) => self
                 .baserelpath
                 .join1(s)
                 .expect("DirEntry.file_name() should not be . or .. nor contain /"),
-            None => return Some(Err(FSError::undecodable_name(path))),
+            None => return Err(FSError::undecodable_name(path)),
         };
-        Some(Ok(if is_dir {
+        Ok(if is_dir {
             ZarrEntry::Directory(ZarrDirectory {
                 path,
                 relpath: relpath.into(),
             })
         } else {
             ZarrEntry::File(ZarrFile { path, relpath })
-        }))
+        })
+    }
+}
+
+impl Iterator for Entries {
+    type Item = Result<ZarrEntry, FSError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(match self.handle.next()? {
+            Ok(p) => self.process_direntry(p),
+            Err(e) => Err(FSError::readdir_error(&self.basepath, e)),
+        })
     }
 }
 
