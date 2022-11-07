@@ -106,33 +106,7 @@ impl ZarrDirectory {
     }
 
     pub fn entries(&self) -> Result<Vec<ZarrEntry>, FSError> {
-        let mut entries = Vec::new();
-        for p in fs::read_dir(&self.path).map_err(|e| FSError::readdir_error(&self.path, e))? {
-            let p = p.map_err(|e| FSError::readdir_error(&self.path, e))?;
-            let path = p.path();
-            let ftype = p.file_type().map_err(|e| FSError::stat_error(&path, e))?;
-            let is_dir = ftype.is_dir()
-                || (ftype.is_symlink()
-                    && fs::metadata(&path)
-                        .map_err(|e| FSError::stat_error(&path, e))?
-                        .is_dir());
-            let relpath = match p.file_name().to_str() {
-                Some(s) => self
-                    .relpath
-                    .join1(s)
-                    .expect("DirEntry.file_name() should not be . or .. nor contain /"),
-                None => return Err(FSError::undecodable_name(path)),
-            };
-            entries.push(if is_dir {
-                ZarrEntry::Directory(ZarrDirectory {
-                    path,
-                    relpath: relpath.into(),
-                })
-            } else {
-                ZarrEntry::File(ZarrFile { path, relpath })
-            })
-        }
-        Ok(entries)
+        self.iter_entries()?.collect()
     }
 
     pub fn iter_entries(&self) -> Result<Entries, FSError> {
