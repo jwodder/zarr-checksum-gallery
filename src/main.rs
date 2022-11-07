@@ -15,7 +15,7 @@ struct Arguments {
     debug: bool,
 
     /// Exclude special dotfiles from checksumming
-    #[clap(long)]
+    #[clap(short = 'E', long)]
     exclude_dotfiles: bool,
 
     /// Show TRACE log messages
