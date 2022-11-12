@@ -50,9 +50,7 @@ impl fmt::Debug for EntryPath {
             if i > 0 {
                 f.write_str("/")?;
             }
-            for c in part.chars() {
-                f.write_str(&c.escape_debug().to_string())?;
-            }
+            write!(f, "{}", part.escape_debug())?;
         }
         f.write_str("\"")?;
         Ok(())
