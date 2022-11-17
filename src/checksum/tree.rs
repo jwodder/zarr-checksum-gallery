@@ -240,10 +240,21 @@ mod test {
                 size: 24,
             },
         ];
-        let sample = ChecksumTree::from_files(files).unwrap();
+        let mut sample = ChecksumTree::from_files(files).unwrap();
         assert_eq!(
             sample.checksum(),
             "4313ab36412db2981c3ed391b38604d6-5--1516"
+        );
+        sample
+            .add_file(FileChecksum {
+                relpath: "arr_0/1".try_into().unwrap(),
+                checksum: "d41d8cd98f00b204e9800998ecf8427e".into(),
+                size: 0,
+            })
+            .unwrap();
+        assert_eq!(
+            sample.checksum(),
+            "46bf6cacf13e20cd09eda687e367af3a-6--1516",
         );
     }
 
