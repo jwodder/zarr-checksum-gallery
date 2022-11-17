@@ -93,3 +93,12 @@ Implementations
 
 - `recursive` — Walk the directory tree recursively and depth-first, computing
   the checksum for each directory as soon as possible
+
+- `tree` — Like `fastio`, but instead of displaying only the final checksum,
+  shows a textual tree of the files & directories within the directory tree and
+  their corresponding checksums
+
+  **Options:**
+
+    - `-t <NUM>`/`--threads <NUM>` — Set the number of threads to use.  The
+      default value is the number of logical CPU cores on the machine.

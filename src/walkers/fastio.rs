@@ -1,5 +1,5 @@
 use super::jobstack::JobStack;
-use crate::checksum::compile_checksum;
+use crate::checksum::ChecksumTree;
 use crate::errors::ChecksumError;
 use crate::zarr::*;
 use log::{trace, warn};
@@ -17,6 +17,13 @@ use std::thread;
 /// This builds an in-memory tree of all file checksums for computing the final
 /// Zarr checksum.
 pub fn fastio_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<String, ChecksumError> {
+    Ok(fastio_checksum_tree(zarr, threads)?.into_checksum())
+}
+
+pub fn fastio_checksum_tree(
+    zarr: &Zarr,
+    threads: NonZeroUsize,
+) -> Result<ChecksumTree, ChecksumError> {
     let stack = Arc::new(JobStack::new([ZarrEntry::Directory(zarr.root_dir())]));
     let (sender, receiver) = channel();
     for i in 0..threads.get() {
@@ -79,6 +86,6 @@ pub fn fastio_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<String, Che
     }
     match err {
         Some(e) => Err(e.into()),
-        None => Ok(compile_checksum(infos)?),
+        None => Ok(ChecksumTree::from_files(infos)?),
     }
 }

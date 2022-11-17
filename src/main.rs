@@ -77,6 +77,15 @@ enum Command {
         /// Path to the directory to checksum
         dirpath: PathBuf,
     },
+    /// Do a multithreaded directory traversal and draw a tree of checksums
+    Tree {
+        /// Set the number of threads to use
+        #[clap(short, long, default_value_t = default_jobs())]
+        threads: NonZeroUsize,
+
+        /// Path to the directory to checksum
+        dirpath: PathBuf,
+    },
 }
 
 impl Arguments {
@@ -133,6 +142,11 @@ impl Arguments {
             Command::Recursive { dirpath } => {
                 recursive_checksum(&Zarr::new(dirpath).exclude_dotfiles(self.exclude_dotfiles))
             }
+            Command::Tree { threads, dirpath } => fastio_checksum_tree(
+                &Zarr::new(dirpath).exclude_dotfiles(self.exclude_dotfiles),
+                threads,
+            )
+            .map(|chktree| termtree::Tree::from(chktree).to_string()),
         }
     }
 }
