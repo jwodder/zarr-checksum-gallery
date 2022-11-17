@@ -416,7 +416,7 @@ cfg_if! {
 #[apply(test_cases)]
 fn test_walkdir_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let r = walkdir_checksum(case.zarr());
+        let r = walkdir_checksum(&case.zarr());
         case.check(r);
     }
 }
@@ -424,7 +424,7 @@ fn test_walkdir_checksum(#[case] case: Option<TestCase>) {
 #[apply(test_cases)]
 fn test_recursive_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let r = recursive_checksum(case.zarr());
+        let r = recursive_checksum(&case.zarr());
         case.check(r);
     }
 }
@@ -432,7 +432,7 @@ fn test_recursive_checksum(#[case] case: Option<TestCase>) {
 #[apply(test_cases)]
 fn test_breadth_first_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let r = breadth_first_checksum(case.zarr());
+        let r = breadth_first_checksum(&case.zarr());
         case.check(r);
     }
 }
@@ -440,7 +440,7 @@ fn test_breadth_first_checksum(#[case] case: Option<TestCase>) {
 #[apply(test_cases)]
 fn test_fastio_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let r = fastio_checksum(case.zarr(), default_jobs());
+        let r = fastio_checksum(&case.zarr(), default_jobs());
         case.check(r);
     }
 }
@@ -448,7 +448,7 @@ fn test_fastio_checksum(#[case] case: Option<TestCase>) {
 #[apply(test_cases)]
 fn test_depth_first_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let r = depth_first_checksum(case.zarr());
+        let r = depth_first_checksum(&case.zarr());
         case.check(r);
     }
 }
@@ -457,7 +457,7 @@ fn test_depth_first_checksum(#[case] case: Option<TestCase>) {
 #[tokio::test]
 async fn test_fastasync_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let r = fastasync_checksum(case.zarr(), default_jobs()).await;
+        let r = fastasync_checksum(&case.zarr(), default_jobs()).await;
         case.check(r);
     }
 }
@@ -465,7 +465,7 @@ async fn test_fastasync_checksum(#[case] case: Option<TestCase>) {
 #[apply(test_cases)]
 fn test_collapsio_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let r = collapsio_checksum(case.zarr(), default_jobs());
+        let r = collapsio_checksum(&case.zarr(), default_jobs());
         case.check(r);
     }
 }

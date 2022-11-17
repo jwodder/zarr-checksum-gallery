@@ -7,7 +7,7 @@ use std::collections::VecDeque;
 ///
 /// This builds an in-memory tree of all file checksums for computing the final
 /// Zarr checksum.
-pub fn breadth_first_checksum(zarr: Zarr) -> Result<String, ChecksumError> {
+pub fn breadth_first_checksum(zarr: &Zarr) -> Result<String, ChecksumError> {
     try_compile_checksum(
         BreadthFirstIterator::new(zarr.root_dir()).map(|r| r.and_then(ZarrFile::into_checksum)),
     )

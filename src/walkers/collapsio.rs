@@ -78,7 +78,7 @@ impl fmt::Debug for Directory {
 /// as a job as soon as possible.
 ///
 /// The `threads` argument determines the number of worker threads to use.
-pub fn collapsio_checksum(zarr: Zarr, threads: NonZeroUsize) -> Result<String, ChecksumError> {
+pub fn collapsio_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<String, ChecksumError> {
     let stack = Arc::new(JobStack::new([Job::Entry(
         ZarrEntry::Directory(zarr.root_dir()),
         None,

@@ -108,7 +108,7 @@ impl<T> AsyncJobStack<T> {
 /// This builds an in-memory tree of all file checksums for computing the final
 /// Zarr checksum.
 pub async fn fastasync_checksum(
-    zarr: Zarr,
+    zarr: &Zarr,
     workers: NonZeroUsize,
 ) -> Result<String, ChecksumError> {
     let stack = Arc::new(AsyncJobStack::new([ZarrEntry::Directory(zarr.root_dir())]));

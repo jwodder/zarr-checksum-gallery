@@ -47,7 +47,7 @@ impl Directory {
 ///
 /// The checksum for each directory is computed as soon as the checksums for
 /// all of its entries are computed.
-pub fn depth_first_checksum(zarr: Zarr) -> Result<String, ChecksumError> {
+pub fn depth_first_checksum(zarr: &Zarr) -> Result<String, ChecksumError> {
     let mut dirstack = vec![OpenDir::new(zarr.root_dir())?];
     loop {
         let topdir = dirstack.last_mut().unwrap();

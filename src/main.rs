@@ -104,14 +104,14 @@ impl Arguments {
             .unwrap();
         match self.command {
             Command::BreadthFirst { dirpath } => {
-                breadth_first_checksum(Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles))
+                breadth_first_checksum(&Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles))
             }
             Command::Collapsio { threads, dirpath } => collapsio_checksum(
-                Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles),
+                &Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles),
                 threads,
             ),
             Command::DepthFirst { dirpath } => {
-                depth_first_checksum(Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles))
+                depth_first_checksum(&Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles))
             }
             Command::Fastasync {
                 threads,
@@ -128,19 +128,19 @@ impl Arguments {
                     Builder::new_current_thread().enable_all().build().unwrap()
                 };
                 rt.block_on(fastasync_checksum(
-                    Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles),
+                    &Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles),
                     workers,
                 ))
             }
             Command::Fastio { threads, dirpath } => fastio_checksum(
-                Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles),
+                &Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles),
                 threads,
             ),
             Command::Recursive { dirpath } => {
-                recursive_checksum(Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles))
+                recursive_checksum(&Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles))
             }
             Command::Walkdir { dirpath } => {
-                walkdir_checksum(Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles))
+                walkdir_checksum(&Zarr::new(dirpath)?.exclude_dotfiles(self.exclude_dotfiles))
             }
         }
     }

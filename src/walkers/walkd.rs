@@ -8,7 +8,7 @@ use walkdir::WalkDir;
 ///
 /// This builds an in-memory tree of all file checksums for computing the final
 /// Zarr checksum.
-pub fn walkdir_checksum(zarr: Zarr) -> Result<String, ChecksumError> {
+pub fn walkdir_checksum(zarr: &Zarr) -> Result<String, ChecksumError> {
     try_compile_checksum(
         WalkDir::new(zarr.path.clone())
             .follow_links(true)

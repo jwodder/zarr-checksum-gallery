@@ -6,7 +6,7 @@ use crate::zarr::*;
 ///
 /// The checksum for each directory is computed as soon as the checksums for
 /// all of its entries are computed.
-pub fn recursive_checksum(zarr: Zarr) -> Result<String, ChecksumError> {
+pub fn recursive_checksum(zarr: &Zarr) -> Result<String, ChecksumError> {
     Ok(recurse(zarr.root_dir())?.into_checksum())
 }
 

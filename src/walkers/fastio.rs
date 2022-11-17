@@ -16,7 +16,7 @@ use std::thread;
 ///
 /// This builds an in-memory tree of all file checksums for computing the final
 /// Zarr checksum.
-pub fn fastio_checksum(zarr: Zarr, threads: NonZeroUsize) -> Result<String, ChecksumError> {
+pub fn fastio_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<String, ChecksumError> {
     let stack = Arc::new(JobStack::new([ZarrEntry::Directory(zarr.root_dir())]));
     let (sender, receiver) = channel();
     for i in 0..threads.get() {
