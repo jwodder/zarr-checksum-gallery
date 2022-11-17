@@ -163,6 +163,30 @@ impl From<TreeNode> for EntryChecksum {
     }
 }
 
+impl From<ChecksumTree> for termtree::Tree<String> {
+    fn from(chktree: ChecksumTree) -> termtree::Tree<String> {
+        let chksum = chktree.checksum();
+        let mut children = chktree.0.children.into_iter().collect::<Vec<_>>();
+        children.sort_by_key(|(k, _)| k.clone());
+        termtree::Tree::new(chksum).with_leaves(children.into_iter().map(|(_, v)| v))
+    }
+}
+
+impl From<TreeNode> for termtree::Tree<String> {
+    fn from(node: TreeNode) -> termtree::Tree<String> {
+        match node {
+            TreeNode::File(f) => termtree::Tree::new(format!("{} = {}", f.name(), f.checksum())),
+            TreeNode::Directory(d) => {
+                let chksum = d.to_checksum();
+                let mut children = d.children.into_iter().collect::<Vec<_>>();
+                children.sort_by_key(|(k, _)| k.clone());
+                termtree::Tree::new(format!("{}/ = {}", chksum.relpath(), chksum.checksum()))
+                    .with_leaves(children.into_iter().map(|(_, v)| v))
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -290,5 +314,51 @@ mod test {
             })),
         };
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_draw_tree() {
+        let files = vec![
+            FileChecksum {
+                relpath: "arr_0/.zarray".try_into().unwrap(),
+                checksum: "9e30a0a1a465e24220d4132fdd544634".into(),
+                size: 315,
+            },
+            FileChecksum {
+                relpath: "arr_0/0".try_into().unwrap(),
+                checksum: "ed4e934a474f1d2096846c6248f18c00".into(),
+                size: 431,
+            },
+            FileChecksum {
+                relpath: "arr_1/.zarray".try_into().unwrap(),
+                checksum: "9e30a0a1a465e24220d4132fdd544634".into(),
+                size: 315,
+            },
+            FileChecksum {
+                relpath: "arr_1/0".try_into().unwrap(),
+                checksum: "fba4dee03a51bde314e9713b00284a93".into(),
+                size: 431,
+            },
+            FileChecksum {
+                relpath: ".zgroup".try_into().unwrap(),
+                checksum: "e20297935e73dd0154104d4ea53040ab".into(),
+                size: 24,
+            },
+        ];
+        let sample = ChecksumTree::from_files(files).unwrap();
+        let drawing = termtree::Tree::from(sample).to_string();
+        assert_eq!(
+            drawing,
+            concat!(
+                "4313ab36412db2981c3ed391b38604d6-5--1516\n",
+                "├── .zgroup = e20297935e73dd0154104d4ea53040ab\n",
+                "├── arr_0/ = 51c74ec257069ce3a555bdddeb50230a-2--746\n",
+                "│   ├── .zarray = 9e30a0a1a465e24220d4132fdd544634\n",
+                "│   └── 0 = ed4e934a474f1d2096846c6248f18c00\n",
+                "└── arr_1/ = 7b99a0ad9bd8bb3331657e54755b1a31-2--746\n",
+                "    ├── .zarray = 9e30a0a1a465e24220d4132fdd544634\n",
+                "    └── 0 = fba4dee03a51bde314e9713b00284a93\n",
+            )
+        );
     }
 }
