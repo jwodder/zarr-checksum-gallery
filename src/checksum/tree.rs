@@ -180,7 +180,7 @@ impl From<TreeNode> for termtree::Tree<String> {
                 let chksum = d.to_checksum();
                 let mut children = d.children.into_iter().collect::<Vec<_>>();
                 children.sort_by_key(|(k, _)| k.clone());
-                termtree::Tree::new(format!("{}/ = {}", chksum.relpath(), chksum.checksum()))
+                termtree::Tree::new(format!("{}/ = {}", chksum.name(), chksum.checksum()))
                     .with_leaves(children.into_iter().map(|(_, v)| v))
             }
         }
@@ -358,6 +358,27 @@ mod test {
                 "└── arr_1/ = 7b99a0ad9bd8bb3331657e54755b1a31-2--746\n",
                 "    ├── .zarray = 9e30a0a1a465e24220d4132fdd544634\n",
                 "    └── 0 = fba4dee03a51bde314e9713b00284a93\n",
+            )
+        );
+    }
+
+    #[test]
+    fn test_draw_deeper_tree() {
+        let files = vec![FileChecksum {
+            relpath: "foo/bar/baz/quux.dat".try_into().unwrap(),
+            checksum: "9e30a0a1a465e24220d4132fdd544634".into(),
+            size: 315,
+        }];
+        let sample = ChecksumTree::from_files(files).unwrap();
+        let drawing = termtree::Tree::from(sample).to_string();
+        assert_eq!(
+            drawing,
+            concat!(
+                "2dc73d60f44b42c168b0e0dc81aa44b8-1--315\n",
+                "└── foo/ = 348db3d80ccdd9a74e792593760b0070-1--315\n",
+                "    └── bar/ = 6b59406727cc70a04ae099b4fa4b8fea-1--315\n",
+                "        └── baz/ = 8c5ad66123476879b63bc830f36c6baa-1--315\n",
+                "            └── quux.dat = 9e30a0a1a465e24220d4132fdd544634\n",
             )
         );
     }
