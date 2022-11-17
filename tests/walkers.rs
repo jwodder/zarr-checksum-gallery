@@ -7,6 +7,7 @@ use rstest_reuse::{apply, template};
 use std::fs;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
+use tempfile::NamedTempFile;
 use tempfile::{tempdir, TempDir};
 use zarr_checksum_gallery::zarr::Zarr;
 use zarr_checksum_gallery::*;
@@ -28,7 +29,7 @@ static SAMPLE_CHECKSUM: &str = "4313ab36412db2981c3ed391b38604d6-5--1516";
 enum Input {
     Permanent(PathBuf),
     Temporary(TempDir),
-    //TempFile(NamedTempFile),
+    TempFile(NamedTempFile),
     SubTemporary(TempDir, PathBuf),
 }
 
@@ -46,16 +47,10 @@ struct TestCase {
 impl TestCase {
     fn zarr(&self) -> Zarr {
         match &self.input {
-            Input::Permanent(path) => Zarr::new(path)
-                .unwrap()
-                .exclude_dotfiles(self.exclude_dotfiles),
-            Input::Temporary(dir) => Zarr::new(dir.path())
-                .unwrap()
-                .exclude_dotfiles(self.exclude_dotfiles),
-            //Input::TempFile(f) => Zarr::new(f.path()).exclude_dotfiles(self.exclude_dotfiles),
-            Input::SubTemporary(_, path) => Zarr::new(path)
-                .unwrap()
-                .exclude_dotfiles(self.exclude_dotfiles),
+            Input::Permanent(path) => Zarr::new(path).exclude_dotfiles(self.exclude_dotfiles),
+            Input::Temporary(dir) => Zarr::new(dir.path()).exclude_dotfiles(self.exclude_dotfiles),
+            Input::TempFile(f) => Zarr::new(f.path()).exclude_dotfiles(self.exclude_dotfiles),
+            Input::SubTemporary(_, path) => Zarr::new(path).exclude_dotfiles(self.exclude_dotfiles),
         }
     }
 
@@ -111,13 +106,14 @@ fn empty_dir() -> Option<TestCase> {
     })
 }
 
-/*
 fn file_arg() -> Option<TestCase> {
     let tmpfile = NamedTempFile::new().unwrap();
     let path = tmpfile.path().to_path_buf();
     let checker = move |e| match e {
-        ChecksumError::FSError(FSError::NotDirRoot { path: epath }) => {
-            assert_eq!(path, epath)
+        ChecksumError::FSError(FSError::ReaddirError { path: epath, .. }) => {
+            assert_eq!(path, epath);
+            // Unstable:
+            //assert_eq!(source.kind(), std::io::ErrorKind::NotADirectory);
         }
         e => panic!("Got unexpected error: {e:?}"),
     };
@@ -127,7 +123,6 @@ fn file_arg() -> Option<TestCase> {
         exclude_dotfiles: false,
     })
 }
-*/
 
 fn file_symlink() -> Option<TestCase> {
     let tmp_path = tempdir().unwrap();
@@ -380,7 +375,7 @@ fn bad_basedir() -> Option<TestCase> {
 #[case(sample1())]
 #[case(sample2())]
 #[case(empty_dir())]
-//#[case(file_arg())]
+#[case(file_arg())]
 #[case(file_symlink())]
 #[case(dir_symlink())]
 #[case(zarr_symlink())]
