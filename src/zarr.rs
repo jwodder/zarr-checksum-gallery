@@ -28,8 +28,8 @@ static EXCLUDED_DOTFILES: &[&str] = &[
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Zarr {
-    pub path: PathBuf,
-    pub exclude_dotfiles: bool,
+    path: PathBuf,
+    exclude_dotfiles: bool,
 }
 
 impl Zarr {
