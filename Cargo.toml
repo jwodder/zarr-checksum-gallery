@@ -12,21 +12,21 @@ publish = false
 [dependencies]
 clap = { version = "4.1.1", default-features = false, features = ["derive", "error-context", "help", "std", "suggestions", "usage", "wrap_help"] }
 educe = { version = "0.4.20", default-features = false, features = ["Eq", "PartialEq"] }
-enum_dispatch = "0.3.8"
+enum_dispatch = "0.3.11"
 fern = "0.6.1"
 hex = "0.4.3"
 log = "0.4.17"
 md-5 = "0.10.5"
-num_cpus = "1.14.0"
+num_cpus = "1.15.0"
 termtree = "0.4.0"
-thiserror = "1.0.37"
-tokio = { version = "1.21.2", features = ["fs", "macros", "rt", "rt-multi-thread", "sync"] }
-tokio-stream = { version = "0.1.10", features = ["fs"] }
+thiserror = "1.0.38"
+tokio = { version = "1.24.1", features = ["fs", "macros", "rt", "rt-multi-thread", "sync"] }
+tokio-stream = { version = "0.1.11", features = ["fs"] }
 tokio-util = { version = "0.7.4", features = ["io"] }
 
 [dev-dependencies]
 cfg-if = "1.0.0"
 fs_extra = "1.2.0"
-rstest = { version = "0.15.0", default-features = false }
+rstest = { version = "0.16.0", default-features = false }
 rstest_reuse = "0.4.0"
 tempfile = "3.3.0"
