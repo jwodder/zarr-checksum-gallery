@@ -10,7 +10,7 @@ license = "MIT"
 publish = false
 
 [dependencies]
-clap = { version = "4.1.1", default-features = false, features = ["derive", "error-context", "help", "std", "suggestions", "usage", "wrap_help"] }
+clap = { version = "4.1.2", default-features = false, features = ["derive", "error-context", "help", "std", "suggestions", "usage", "wrap_help"] }
 educe = { version = "0.4.20", default-features = false, features = ["Eq", "PartialEq"] }
 enum_dispatch = "0.3.11"
 fern = "0.6.1"
