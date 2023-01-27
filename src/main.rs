@@ -154,7 +154,7 @@ impl Arguments {
 fn main() -> ExitCode {
     match Arguments::parse().run() {
         Ok(checksum) => {
-            println!("{}", checksum);
+            println!("{checksum}");
             ExitCode::SUCCESS
         }
         Err(ChecksumError::ChecksumTreeError(e)) => {
