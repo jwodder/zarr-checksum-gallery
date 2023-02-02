@@ -15,7 +15,6 @@ use tokio_stream::StreamExt;
 
 /// Names of files & directories that are excluded from consideration when
 /// traversing a Zarr
-#[allow(dead_code)]
 static EXCLUDED_DOTFILES: &[&str] = &[
     // This list must be kept in sorted order (enforced by the test
     // `test_excluded_dotfiles_is_sorted()`)
