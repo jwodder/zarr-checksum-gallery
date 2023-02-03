@@ -102,3 +102,19 @@ Implementations
 
     - `-t <NUM>`/`--threads <NUM>` — Set the number of threads to use.  The
       default value is the number of logical CPU cores on the machine.
+
+
+Performance
+===========
+
+Preliminary timings show the following:
+
+- `fastio` is consistently the fastest implementation.
+
+- `collapsio` is sometimes faster than `fastio`, but it has a much larger
+  variance, and its average runtime is slightly above that of `fastio`.
+
+    - Note that `collapsio` should have a smaller memory footprint than
+      `fastio`, but this has not yet been tested.
+
+- All other implementations are about 5 to 6 times slower than `fastio`.
