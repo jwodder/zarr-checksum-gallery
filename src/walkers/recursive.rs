@@ -6,6 +6,21 @@ use crate::zarr::*;
 ///
 /// The checksum for each directory is computed as soon as the checksums for
 /// all of its entries are computed.
+///
+/// The checksumming of the Zarr is performed roughly in accordance with the
+/// following pseudocode:
+///
+/// ```none
+/// fn recursive_checksum(dirpath):
+///     entry_checksums = new List()
+///     for entry in dirpath.listdir():
+///         if entry.is_dir():
+///             entry_checksums.append(recursive_checksum(entry))
+///         else:
+///             entry_checksums.append(checksum_file(entry))
+///     // This step weeds out checksums for empty directories:
+///     return combine_checksums(entry_checksums)
+/// ```
 pub fn recursive_checksum(zarr: &Zarr) -> Result<String, ChecksumError> {
     Ok(recurse(zarr.root_dir())?.into_checksum())
 }
