@@ -733,7 +733,6 @@ dependencies = [
  "hex",
  "log",
  "md-5",
- "num_cpus",
  "rstest",
  "rstest_reuse",
  "tempfile",

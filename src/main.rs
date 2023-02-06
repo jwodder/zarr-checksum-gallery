@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::thread::available_parallelism;
 use tokio::runtime::Builder;
 use zarr_checksum_gallery::zarr::Zarr;
 use zarr_checksum_gallery::*;
@@ -53,8 +54,8 @@ enum Command {
     /// Do an asynchronous directory traversal and build a tree of checksums
     Fastasync {
         /// Set the number of threads for the async runtime to use
-        #[clap(short, long, default_value_t = num_cpus::get())]
-        threads: usize,
+        #[clap(short, long, default_value_t = default_jobs())]
+        threads: NonZeroUsize,
 
         /// Set the number of worker tasks to use
         #[clap(short, long, default_value_t = default_jobs())]
@@ -121,6 +122,7 @@ impl Arguments {
                 workers,
                 dirpath,
             } => {
+                let threads = threads.get();
                 let rt = if threads > 1 {
                     Builder::new_multi_thread()
                         .worker_threads(threads)
@@ -169,5 +171,5 @@ fn main() -> ExitCode {
 }
 
 fn default_jobs() -> NonZeroUsize {
-    NonZeroUsize::new(num_cpus::get().max(1)).unwrap()
+    available_parallelism().expect("Could not determine number of available CPUs")
 }
