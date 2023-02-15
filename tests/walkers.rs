@@ -1,5 +1,6 @@
 extern crate rstest_reuse;
 
+use assert_matches::assert_matches;
 use cfg_if::cfg_if;
 use fs_extra::dir;
 use rstest::rstest;
@@ -7,8 +8,7 @@ use rstest_reuse::{apply, template};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::thread::available_parallelism;
-use tempfile::NamedTempFile;
-use tempfile::{tempdir, TempDir};
+use tempfile::{tempdir, NamedTempFile, TempDir};
 use zarr_checksum_gallery::zarr::Zarr;
 use zarr_checksum_gallery::*;
 
@@ -109,14 +109,9 @@ fn empty_dir() -> Option<TestCase> {
 fn file_arg() -> Option<TestCase> {
     let tmpfile = NamedTempFile::new().unwrap();
     let path = tmpfile.path().to_path_buf();
-    let checker = move |e| match e {
-        ChecksumError::FSError(FSError::ReaddirError { path: epath, .. }) => {
-            assert_eq!(path, epath);
-            // Unstable:
-            //assert_eq!(source.kind(), std::io::ErrorKind::NotADirectory);
-        }
-        e => panic!("Got unexpected error: {e:?}"),
-    };
+    let checker = move |e| assert_matches!(e, ChecksumError::FSError(FSError::ReaddirError { path: epath, .. }) if path == epath);
+    // Unstable:
+    //assert_eq!(source.kind(), std::io::ErrorKind::NotADirectory);
     Some(TestCase {
         input: Input::TempFile(tmpfile),
         expected: Expected::Error(Box::new(checker)),
@@ -260,12 +255,7 @@ fn unreadable_file() -> Option<TestCase> {
     path.push("unreadable");
     fs::write(&path, "You will never see this.\n").unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
-    let checker = move |e| match e {
-        ChecksumError::FSError(FSError::MD5FileError { path: epath, .. }) => {
-            assert_eq!(path, epath)
-        }
-        e => panic!("Got unexpected error: {e}"),
-    };
+    let checker = move |e| assert_matches!(e, ChecksumError::FSError(FSError::MD5FileError { path: epath, .. }) if path == epath);
     Some(TestCase {
         input: Input::Temporary(tmp_path),
         expected: Expected::Error(Box::new(checker)),
@@ -285,12 +275,7 @@ fn unreadable_dir() -> Option<TestCase> {
         // Make the directory readable again so that the temp dir can be
         // cleaned up:
         fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
-        match e {
-            ChecksumError::FSError(FSError::ReaddirError { path: epath, .. }) => {
-                assert_eq!(path, epath)
-            }
-            e => panic!("Got unexpected error: {e:?}"),
-        }
+        assert_matches!(e, ChecksumError::FSError(FSError::ReaddirError { path: epath, .. }) if path == epath);
     };
     Some(TestCase {
         input: Input::Temporary(tmp_path),
@@ -310,12 +295,7 @@ fn bad_filename() -> Option<TestCase> {
         // on such platforms.
         return None;
     }
-    let checker = move |e| match e {
-        ChecksumError::FSError(FSError::UndecodableName { path: epath }) => {
-            assert_eq!(epath, path)
-        }
-        e => panic!("Got unexpected error: {e:?}"),
-    };
+    let checker = move |e| assert_matches!(e, ChecksumError::FSError(FSError::UndecodableName { path: epath }) if path == epath);
     Some(TestCase {
         input: Input::Temporary(tmp_path),
         expected: Expected::Error(Box::new(checker)),
@@ -335,12 +315,7 @@ fn bad_dirname() -> Option<TestCase> {
         return None;
     }
     fs::write(badpath.join("somefile"), "This is a file.\n").unwrap();
-    let checker = move |e| match e {
-        ChecksumError::FSError(FSError::UndecodableName { path: epath }) => {
-            assert_eq!(epath, badpath)
-        }
-        e => panic!("Got unexpected error: {e:?}"),
-    };
+    let checker = move |e| assert_matches!(e, ChecksumError::FSError(FSError::UndecodableName { path: epath }) if epath == badpath);
     Some(TestCase {
         input: Input::Temporary(tmp_path),
         expected: Expected::Error(Box::new(checker)),
