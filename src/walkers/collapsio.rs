@@ -2,6 +2,7 @@ use super::jobstack::JobStack;
 use crate::checksum::nodes::*;
 use crate::errors::{ChecksumError, FSError};
 use crate::zarr::*;
+use either::{Either, Left, Right};
 use log::{error, trace, warn};
 use std::fmt;
 use std::iter::from_fn;
@@ -91,27 +92,31 @@ pub fn collapsio_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<String, 
             trace!("[{i}] Starting thread");
             for entry in from_fn(|| stack.pop()) {
                 trace!("[{i}] Popped {entry:?} from stack");
-                let (to_push, to_send) = process(i, entry);
+                let out = process(i, entry);
                 stack.job_done();
-                if let Some(v) = to_send {
-                    // If we've shut down, don't send anything except Errs
-                    if v.is_err() || !stack.is_shutdown() {
-                        if v.is_err() {
-                            stack.shutdown();
+                match out {
+                    Left(to_push) => {
+                        if !to_push.is_empty() {
+                            stack.extend(to_push);
                         }
-                        trace!("[{i}] Sending {v:?} to output");
-                        match sender.send(v) {
-                            Ok(_) => (),
-                            Err(_) => {
-                                warn!("[{i}] Failed to send; exiting");
+                    }
+                    Right(to_send) => {
+                        // If we've shut down, don't send anything except Errs
+                        if to_send.is_err() || !stack.is_shutdown() {
+                            if to_send.is_err() {
                                 stack.shutdown();
-                                return;
+                            }
+                            trace!("[{i}] Sending {to_send:?} to output");
+                            match sender.send(to_send) {
+                                Ok(_) => (),
+                                Err(_) => {
+                                    warn!("[{i}] Failed to send; exiting");
+                                    stack.shutdown();
+                                    return;
+                                }
                             }
                         }
                     }
-                }
-                if !to_push.is_empty() {
-                    stack.extend(to_push);
                 }
             }
             trace!("[{i}] Ending thread");
@@ -144,7 +149,7 @@ pub fn collapsio_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<String, 
     }
 }
 
-fn process(i: usize, entry: Job) -> (Vec<Job>, Option<Result<String, FSError>>) {
+fn process(i: usize, entry: Job) -> Either<Vec<Job>, Result<String, FSError>> {
     match entry {
         Job::Entry(ZarrEntry::Directory(zd), parent) => match zd.entries() {
             Ok(entries) => {
@@ -152,24 +157,23 @@ fn process(i: usize, entry: Job) -> (Vec<Job>, Option<Result<String, FSError>>) 
                 let arcdir = Arc::new(Mutex::new(Directory::new(zd, entries.len(), parent)));
                 if entries.is_empty() {
                     trace!("[{i}] Directory {thisdirpath:?} is empty; pushing onto stack");
-                    (vec![Job::CompletedDir(arcdir)], None)
+                    Left(vec![Job::CompletedDir(arcdir)])
                 } else {
-                    (
+                    Left(
                         entries
                             .into_iter()
                             .inspect(|n| trace!("[{i}] Pushing {n:?} onto stack"))
                             .map(|n| Job::Entry(n, Some(Arc::clone(&arcdir))))
                             .collect(),
-                        None,
                     )
                 }
             }
-            Err(e) => (Vec::new(), Some(Err(e))),
+            Err(e) => Right(Err(e)),
         },
         Job::Entry(ZarrEntry::File(zf), parent) => {
             let node = match zf.into_checksum() {
                 Ok(n) => n,
-                Err(e) => return (Vec::new(), Some(Err(e))),
+                Err(e) => return Right(Err(e)),
             };
             let parent = parent.as_ref().expect("File without a parent directory");
             {
@@ -180,9 +184,9 @@ fn process(i: usize, entry: Job) -> (Vec<Job>, Option<Result<String, FSError>>) 
                         "[{i}] Computed all checksums within directory {}; pushing onto stack",
                         p.relpath()
                     );
-                    (vec![Job::CompletedDir(Arc::clone(parent))], None)
+                    Left(vec![Job::CompletedDir(Arc::clone(parent))])
                 } else {
-                    (Vec::new(), None)
+                    Left(Vec::new())
                 }
             }
         }
@@ -204,12 +208,12 @@ fn process(i: usize, entry: Job) -> (Vec<Job>, Option<Result<String, FSError>>) 
                         "[{i}] Computed all checksums within directory {}; pushing onto stack",
                         p.relpath()
                     );
-                    (vec![Job::CompletedDir(Arc::clone(&parent))], None)
+                    Left(vec![Job::CompletedDir(Arc::clone(&parent))])
                 } else {
-                    (Vec::new(), None)
+                    Left(Vec::new())
                 }
             } else {
-                (Vec::new(), Some(Ok(node.into_checksum())))
+                Right(Ok(node.into_checksum()))
             }
         }
     }
