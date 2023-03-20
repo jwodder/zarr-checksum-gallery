@@ -1,4 +1,4 @@
-use crate::checksum::compile_checksum;
+use crate::checksum::ChecksumTree;
 use crate::errors::ChecksumError;
 use crate::zarr::*;
 use log::{trace, warn};
@@ -159,12 +159,15 @@ pub async fn fastasync_checksum(
     drop(sender);
     // Force the receiver to receive everything (rather than breaking out early
     // on an Err) in order to ensure that all workers run to completion
-    let mut infos = Vec::new();
+    let mut tree = Ok(ChecksumTree::new());
     let mut err = None;
     while let Some(v) = receiver.recv().await {
         match v {
             Ok(i) => {
-                infos.push(i);
+                tree = tree.and_then(|mut t| {
+                    t.add_file(i)?;
+                    Ok(t)
+                });
             }
             Err(e) => {
                 err.get_or_insert(e);
@@ -173,6 +176,6 @@ pub async fn fastasync_checksum(
     }
     match err {
         Some(e) => Err(e.into()),
-        None => Ok(compile_checksum(infos)?),
+        None => tree.map(ChecksumTree::into_checksum),
     }
 }

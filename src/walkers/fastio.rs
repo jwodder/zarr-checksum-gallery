@@ -72,12 +72,15 @@ pub fn fastio_checksum_tree(
     drop(sender);
     // Force the receiver to receive everything (rather than breaking out early
     // on an Err) in order to ensure that all threads run to completion
-    let mut infos = Vec::new();
+    let mut tree = Ok(ChecksumTree::new());
     let mut err = None;
     for v in receiver {
         match v {
             Ok(i) => {
-                infos.push(i);
+                tree = tree.and_then(|mut t| {
+                    t.add_file(i)?;
+                    Ok(t)
+                });
             }
             Err(e) => {
                 err.get_or_insert(e);
@@ -86,6 +89,6 @@ pub fn fastio_checksum_tree(
     }
     match err {
         Some(e) => Err(e.into()),
-        None => Ok(ChecksumTree::from_files(infos)?),
+        None => tree,
     }
 }
