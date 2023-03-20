@@ -18,7 +18,7 @@ fern = "0.6.1"
 hex = "0.4.3"
 log = "0.4.17"
 md-5 = "0.10.5"
-termtree = "0.4.0"
+termtree = "0.4.1"
 thiserror = "1.0.40"
 tokio = { version = "1.26.0", features = ["fs", "macros", "rt", "rt-multi-thread", "sync"] }
 tokio-stream = { version = "0.1.12", features = ["fs"] }
