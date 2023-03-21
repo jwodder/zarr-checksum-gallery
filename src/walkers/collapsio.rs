@@ -50,18 +50,19 @@ impl Job {
                     Ok(n) => n,
                     Err(e) => return Output::ToSend(Err(e)),
                 };
-                parent
+                // If the send() fails, it must be because the job stack was
+                // shut down, dropping the receiver, so do nothing.
+                let _ = parent
                     .expect("File without a parent directory")
-                    .send(node.into())
-                    .expect("Failed to send checksum to parent node");
+                    .send(node.into());
                 Output::Nil
             }
             Job::CompletedDir { dir, recv, parent } => {
                 let node = dir.get_checksum(recv);
                 if let Some(parent) = parent {
-                    parent
-                        .send(node.into())
-                        .expect("Failed to send checksum to parent node");
+                    // If the send() fails, it must be because the job stack
+                    // was shut down, dropping the receiver, so do nothing.
+                    let _ = parent.send(node.into());
                     Output::Nil
                 } else {
                     Output::ToSend(Ok(node.into_checksum()))
