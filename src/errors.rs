@@ -10,20 +10,20 @@ use thiserror::Error;
 pub enum FSError {
     /// Returned when an error occurs while trying to compute the MD5 digest of
     /// a filepath
-    #[error("Error digesting file: {}: {source}", .path.display())]
+    #[error("error digesting file: {}: {source}", .path.display())]
     MD5FileError { path: PathBuf, source: io::Error },
 
-    #[error("Final componenet of path {path:?} is not valid UTF-8")]
+    #[error("final componenet of path {path:?} is not valid UTF-8")]
     UndecodableName { path: PathBuf },
 
     /// Returned when an error occurs while trying to fetch a path's filesystem
     /// metadata
-    #[error("Error stat'ing file: {}: {source}", .path.display())]
+    #[error("error stat'ing file: {}: {source}", .path.display())]
     StatError { path: PathBuf, source: io::Error },
 
     /// Returned when an error occurs while trying to list the contents of a
     /// directory
-    #[error("Error reading directory: {}: {source}", .path.display())]
+    #[error("error reading directory: {}: {source}", .path.display())]
     ReaddirError { path: PathBuf, source: io::Error },
 }
 
@@ -62,7 +62,7 @@ impl FSError {
 pub enum ChecksumTreeError {
     /// Returned when a node would be added to a `ChecksumTree` in which a
     /// parent path of the node is already present as a file
-    #[error("Path type conflict error for {path:?}")]
+    #[error("path type conflict error for {path:?}")]
     PathTypeConflict {
         /// The path of the node that would have been added
         path: EntryPath,
@@ -70,7 +70,7 @@ pub enum ChecksumTreeError {
 
     /// Returned when a node would be added to a `ChecksumTree` which already
     /// contains a file or directory at the node's path
-    #[error("File {path:?} added to checksum tree twice")]
+    #[error("file {path:?} added to checksum tree twice")]
     DoubleAdd {
         /// The path of the node that would have been added
         path: EntryPath,
@@ -92,9 +92,9 @@ pub enum ChecksumError {
 ///
 /// The error contains the invalid path in question as a [`PathBuf`].
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
-#[error("Invalid, unnormalized, or undecodable relative path: {0:?}")]
+#[error("invalid, unnormalized, or undecodable relative path: {0:?}")]
 pub struct EntryPathError(pub PathBuf);
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
-#[error("Invalid path name: {0:?}")]
+#[error("invalid path name: {0:?}")]
 pub struct EntryNameError(pub String);
