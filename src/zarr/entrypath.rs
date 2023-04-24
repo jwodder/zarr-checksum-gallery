@@ -17,6 +17,8 @@ impl EntryPath {
     /// Return an iterator over the parent paths of the path, starting at the
     /// first component and stopping before the file name
     ///
+    /// # Example
+    ///
     /// ```
     /// # use zarr_checksum_gallery::zarr::EntryPath;
     /// let path = EntryPath::try_from("foo/bar/baz").unwrap();
