@@ -15,7 +15,7 @@ educe = { version = "0.4.22", default-features = false, features = ["Eq", "Parti
 enum_dispatch = "0.3.11"
 fern = "0.6.2"
 hex = "0.4.3"
-log = "0.4.17"
+log = "0.4.18"
 md-5 = "0.10.5"
 termtree = "0.4.1"
 thiserror = "1.0.40"
