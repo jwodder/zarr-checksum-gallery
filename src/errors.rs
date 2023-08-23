@@ -86,9 +86,8 @@ pub enum ChecksumError {
     FSError(#[from] FSError),
 }
 
-/// Error returned when trying to construct an
-/// [`EntryPath`][crate::zarr::EntryPath] from an invalid, unnormalized, or
-/// undecodable relative path
+/// Error returned when trying to construct an [`EntryPath`] from an invalid,
+/// unnormalized, or undecodable relative path
 ///
 /// The error contains the invalid path in question as a [`PathBuf`].
 #[derive(Clone, Debug, Eq, Error, PartialEq)]

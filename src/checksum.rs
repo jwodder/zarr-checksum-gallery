@@ -4,8 +4,8 @@
 //! can be obtained via the
 //! [`ZarrFile::into_checksum()`][crate::zarr::ZarrFile::into_checksum]
 //! function.  The checksum for a directory whose entries have all had their
-//! checksums calculated is represented by a
-//! [`DirChecksum`][nodes::DirChecksum], which can be computed with
+//! checksums calculated is represented by a [`DirChecksum`], which can be
+//! computed with
 //! [`ZarrDirectory::get_checksum()`][crate::zarr::ZarrDirectory::get_checksum].
 //! The checksum for an entire Zarr can then be computed by building up these
 //! types, by building up a [`ChecksumTree`] from [`FileChecksum`]s, or by
