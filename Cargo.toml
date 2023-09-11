@@ -11,7 +11,7 @@ publish = false
 
 [dependencies]
 clap = { version = "4.4.2", default-features = false, features = ["derive", "error-context", "help", "std", "suggestions", "usage", "wrap_help"] }
-educe = { version = "0.4.22", default-features = false, features = ["Eq", "PartialEq"] }
+educe = { version = "0.4.23", default-features = false, features = ["Eq", "PartialEq"] }
 enum_dispatch = "0.3.12"
 fern = "0.6.2"
 hex = "0.4.3"

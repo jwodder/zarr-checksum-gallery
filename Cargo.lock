@@ -28,9 +28,9 @@ dependencies = [
 
 [[package]]
 name = "anstyle"
-version = "1.0.2"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15c4c2c83f81532e5845a733998b6971faca23490340a418e9b72a3ec9de12ea"
+checksum = "b84bf0a05bbb2a83e5eb6fa36bb6e87baa08193c35ff52bbf6b38d8af2890e46"
 
 [[package]]
 name = "assert_matches"
@@ -82,9 +82,9 @@ dependencies = [
 
 [[package]]
 name = "bytes"
-version = "1.4.0"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89b2fd2a0dcf38d7971e2194b6b6eebab45ae01067456a7fd93d5547a61b70be"
+checksum = "a2bd12c1caf447e69cd4528f47f94d203fd2582878ecb9e9465484c4148a8223"
 
 [[package]]
 name = "cc"
@@ -163,9 +163,9 @@ dependencies = [
 
 [[package]]
 name = "educe"
-version = "0.4.22"
+version = "0.4.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "079044df30bb07de7d846d41a184c4b00e66ebdac93ee459253474f3a47e50ae"
+checksum = "0f0042ff8246a363dbe77d2ceedb073339e85a804b9a47636c6e016a9a32c05f"
 dependencies = [
  "enum-ordinalize",
  "proc-macro2",
