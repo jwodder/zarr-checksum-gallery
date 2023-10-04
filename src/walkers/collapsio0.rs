@@ -64,6 +64,7 @@ impl Job {
                 let dir = match Arc::try_unwrap(arcdir) {
                     Ok(dir) => dir,
                     Err(a) => {
+                        // TODO: Send an Err when this happens
                         error!("Expected CompletedDir to have only one strong reference, but there were {}!", Arc::strong_count(&a));
                         panic!("CompletedDir should have only one strong reference");
                     }
