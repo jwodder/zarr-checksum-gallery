@@ -17,6 +17,7 @@ enum Job {
     CompletedDir(Arc<Directory>),
 }
 
+#[derive(Debug)]
 struct Directory {
     dir: ZarrDirectory,
     data: Mutex<DirectoryData>,
@@ -67,16 +68,11 @@ impl Directory {
     }
 }
 
-impl fmt::Debug for Directory {
+impl fmt::Debug for DirectoryData {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Directory")
-            .field("dir", &self.dir)
-            //.field("nodes", &format_args!("<{} nodes>", self.nodes.len()))
-            //.field("todo", &self.todo)
-            .field(
-                "parent",
-                &self.parent.as_ref().map(|_| format_args!("<..>")),
-            )
+        f.debug_struct("DirectoryData")
+            .field("nodes", &format_args!("<{} nodes>", self.nodes.len()))
+            .field("todo", &self.todo)
             .finish()
     }
 }
