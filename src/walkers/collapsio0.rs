@@ -2,7 +2,6 @@ use super::jobstack::JobStack;
 use crate::checksum::nodes::*;
 use crate::errors::{ChecksumError, FSError};
 use crate::zarr::*;
-use either::{Either, Left, Right};
 use log::{error, trace, warn};
 use std::fmt;
 use std::iter::from_fn;
@@ -15,6 +14,84 @@ use std::thread;
 enum Job {
     Entry(ZarrEntry, Option<Arc<Directory>>),
     CompletedDir(Arc<Directory>),
+}
+
+impl Job {
+    fn mkroot(zarr: &Zarr) -> Job {
+        Job::Entry(ZarrEntry::Directory(zarr.root_dir()), None)
+    }
+
+    fn process(self, i: usize) -> Output {
+        match self {
+            Job::Entry(ZarrEntry::Directory(zd), parent) => match zd.entries() {
+                Ok(entries) => {
+                    let arcdir = Arc::new(Directory::new(zd, entries.len(), parent));
+                    if entries.is_empty() {
+                        trace!(
+                            "[{i}] Directory {:?} is empty; pushing onto stack",
+                            arcdir.relpath()
+                        );
+                        Output::ToPush(vec![Job::CompletedDir(arcdir)])
+                    } else {
+                        Output::ToPush(
+                            entries
+                                .into_iter()
+                                .inspect(|n| trace!("[{i}] Pushing {n:?} onto stack"))
+                                .map(|n| Job::Entry(n, Some(Arc::clone(&arcdir))))
+                                .collect(),
+                        )
+                    }
+                }
+                Err(e) => Output::ToSend(Err(e)),
+            },
+            Job::Entry(ZarrEntry::File(zf), parent) => {
+                let node = match zf.into_checksum() {
+                    Ok(n) => n,
+                    Err(e) => return Output::ToSend(Err(e)),
+                };
+                let parent = parent.expect("File without a parent directory");
+                if parent.add(node.into()) {
+                    trace!(
+                        "[{i}] Computed all checksums within directory {}; pushing onto stack",
+                        parent.relpath()
+                    );
+                    Output::ToPush(vec![Job::CompletedDir(parent)])
+                } else {
+                    Output::Nil
+                }
+            }
+            Job::CompletedDir(arcdir) => {
+                let dir = match Arc::try_unwrap(arcdir) {
+                    Ok(dir) => dir,
+                    Err(a) => {
+                        error!("Expected CompletedDir to have only one strong reference, but there were {}!", Arc::strong_count(&a));
+                        panic!("CompletedDir should have only one strong reference");
+                    }
+                };
+                let parent = dir.parent.as_ref().map(Arc::clone);
+                let node = dir.checksum();
+                if let Some(parent) = parent {
+                    if parent.add(node.into()) {
+                        trace!(
+                            "[{i}] Computed all checksums within directory {}; pushing onto stack",
+                            parent.relpath()
+                        );
+                        Output::ToPush(vec![Job::CompletedDir(parent)])
+                    } else {
+                        Output::Nil
+                    }
+                } else {
+                    Output::ToSend(Ok(node.into_checksum()))
+                }
+            }
+        }
+    }
+}
+
+enum Output {
+    ToPush(Vec<Job>),
+    ToSend(Result<String, FSError>),
+    Nil,
 }
 
 #[derive(Debug)]
@@ -83,10 +160,7 @@ impl fmt::Debug for DirectoryData {
 ///
 /// The `threads` argument determines the number of worker threads to use.
 pub fn collapsio0_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<String, ChecksumError> {
-    let stack = Arc::new(JobStack::new([Job::Entry(
-        ZarrEntry::Directory(zarr.root_dir()),
-        None,
-    )]));
+    let stack = Arc::new(JobStack::new([Job::mkroot(zarr)]));
     let (sender, receiver) = channel();
     for i in 0..threads.get() {
         let stack = Arc::clone(&stack);
@@ -95,15 +169,11 @@ pub fn collapsio0_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<String,
             trace!("[{i}] Starting thread");
             for entry in from_fn(|| stack.pop()) {
                 trace!("[{i}] Popped {entry:?} from stack");
-                let out = process(i, entry);
+                let out = entry.process(i);
                 stack.job_done();
                 match out {
-                    Left(to_push) => {
-                        if !to_push.is_empty() {
-                            stack.extend(to_push);
-                        }
-                    }
-                    Right(to_send) => {
+                    Output::ToPush(to_push) => stack.extend(to_push),
+                    Output::ToSend(to_send) => {
                         // If we've shut down, don't send anything except Errs
                         if to_send.is_err() || !stack.is_shutdown() {
                             if to_send.is_err() {
@@ -117,6 +187,7 @@ pub fn collapsio0_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<String,
                             }
                         }
                     }
+                    Output::Nil => (),
                 }
             }
             trace!("[{i}] Ending thread");
@@ -146,71 +217,5 @@ pub fn collapsio0_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<String,
                 panic!("Neither checksum nor errors were received!");
             }
         },
-    }
-}
-
-fn process(i: usize, entry: Job) -> Either<Vec<Job>, Result<String, FSError>> {
-    match entry {
-        Job::Entry(ZarrEntry::Directory(zd), parent) => match zd.entries() {
-            Ok(entries) => {
-                let arcdir = Arc::new(Directory::new(zd, entries.len(), parent));
-                if entries.is_empty() {
-                    trace!(
-                        "[{i}] Directory {:?} is empty; pushing onto stack",
-                        arcdir.relpath()
-                    );
-                    Left(vec![Job::CompletedDir(arcdir)])
-                } else {
-                    Left(
-                        entries
-                            .into_iter()
-                            .inspect(|n| trace!("[{i}] Pushing {n:?} onto stack"))
-                            .map(|n| Job::Entry(n, Some(Arc::clone(&arcdir))))
-                            .collect(),
-                    )
-                }
-            }
-            Err(e) => Right(Err(e)),
-        },
-        Job::Entry(ZarrEntry::File(zf), parent) => {
-            let node = match zf.into_checksum() {
-                Ok(n) => n,
-                Err(e) => return Right(Err(e)),
-            };
-            let parent = parent.expect("File without a parent directory");
-            if parent.add(node.into()) {
-                trace!(
-                    "[{i}] Computed all checksums within directory {}; pushing onto stack",
-                    parent.relpath()
-                );
-                Left(vec![Job::CompletedDir(parent)])
-            } else {
-                Left(Vec::new())
-            }
-        }
-        Job::CompletedDir(arcdir) => {
-            let dir = match Arc::try_unwrap(arcdir) {
-                Ok(dir) => dir,
-                Err(a) => {
-                    error!("Expected CompletedDir to have only one strong reference, but there were {}!", Arc::strong_count(&a));
-                    panic!("CompletedDir should have only one strong reference");
-                }
-            };
-            let parent = dir.parent.as_ref().map(Arc::clone);
-            let node = dir.checksum();
-            if let Some(parent) = parent {
-                if parent.add(node.into()) {
-                    trace!(
-                        "[{i}] Computed all checksums within directory {}; pushing onto stack",
-                        parent.relpath()
-                    );
-                    Left(vec![Job::CompletedDir(parent)])
-                } else {
-                    Left(Vec::new())
-                }
-            } else {
-                Right(Ok(node.into_checksum()))
-            }
-        }
     }
 }
