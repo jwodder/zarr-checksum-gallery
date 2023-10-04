@@ -1,7 +1,6 @@
 use super::nodes::*;
 use crate::errors::ChecksumTreeError;
 use crate::zarr::EntryPath;
-use educe::Educe;
 use std::cell::RefCell;
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -17,14 +16,21 @@ use std::collections::{hash_map::Entry, HashMap};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ChecksumTree(DirTree);
 
-#[derive(Clone, Debug, Educe)]
-#[educe(Eq, PartialEq)]
+#[derive(Clone, Debug)]
 struct DirTree {
     relpath: EntryPath,
     children: HashMap<String, TreeNode>,
-    #[educe(PartialEq(ignore))]
     checksum_cache: RefCell<Option<DirChecksum>>,
 }
+
+impl PartialEq for DirTree {
+    fn eq(&self, other: &DirTree) -> bool {
+        // Don't compare checksum_cache
+        (&self.relpath, &self.children) == (&other.relpath, &other.children)
+    }
+}
+
+impl Eq for DirTree {}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum TreeNode {
