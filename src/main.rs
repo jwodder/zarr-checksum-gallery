@@ -45,6 +45,14 @@ enum Command {
         /// Path to the directory to checksum
         dirpath: PathBuf,
     },
+    Collapsio0 {
+        /// Set the number of threads to use
+        #[clap(short, long, default_value_t = default_jobs())]
+        threads: NonZeroUsize,
+
+        /// Path to the directory to checksum
+        dirpath: PathBuf,
+    },
     /// Traverse the directory depth-first & iteratively, computing directory
     /// checksums as soon as possible
     DepthFirst {
@@ -111,6 +119,10 @@ impl Arguments {
                 breadth_first_checksum(&Zarr::new(dirpath).exclude_dotfiles(self.exclude_dotfiles))
             }
             Command::Collapsio { threads, dirpath } => collapsio_checksum(
+                &Zarr::new(dirpath).exclude_dotfiles(self.exclude_dotfiles),
+                threads,
+            ),
+            Command::Collapsio0 { threads, dirpath } => collapsio0_checksum(
                 &Zarr::new(dirpath).exclude_dotfiles(self.exclude_dotfiles),
                 threads,
             ),

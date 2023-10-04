@@ -8,6 +8,7 @@
 //! indicates a bug in the traversal function.
 mod breadth_first;
 mod collapsio;
+mod collapsio0;
 mod depth_first;
 mod fastasync;
 mod fastio;
@@ -15,6 +16,7 @@ mod jobstack;
 mod recursive;
 pub use breadth_first::*;
 pub use collapsio::*;
+pub use collapsio0::*;
 pub use depth_first::*;
 pub use fastasync::*;
 pub use fastio::*;

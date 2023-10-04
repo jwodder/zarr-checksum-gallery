@@ -417,6 +417,26 @@ async fn test_fastasync_checksum(#[case] case: Option<TestCase>) {
 }
 
 #[apply(test_cases)]
+fn test_collapsio0_checksum(#[case] case: Option<TestCase>) {
+    if let Some(case) = case {
+        if fern::Dispatch::new()
+            .format(|out, message, record| {
+                out.finish(format_args!("[{:<5}] {}", record.level(), message))
+            })
+            .level(log::LevelFilter::Trace)
+            .chain(std::io::stderr())
+            .apply()
+            .is_err()
+        {
+            log::set_max_level(log::LevelFilter::Trace);
+        }
+        let r = collapsio0_checksum(&case.zarr(), available_parallelism().unwrap());
+        log::set_max_level(log::LevelFilter::Off);
+        case.check(r);
+    }
+}
+
+#[apply(test_cases)]
 fn test_collapsio_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
         if fern::Dispatch::new()
