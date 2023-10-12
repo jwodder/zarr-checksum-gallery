@@ -1,8 +1,8 @@
 use super::nodes::*;
 use crate::errors::ChecksumTreeError;
 use crate::zarr::EntryPath;
-use std::cell::RefCell;
 use std::collections::{hash_map::Entry, HashMap};
+use std::fmt;
 
 /// A tree of [`FileChecksum`]s, for computing the final checksum for an entire
 /// Zarr one file at a time
@@ -16,21 +16,11 @@ use std::collections::{hash_map::Entry, HashMap};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ChecksumTree(DirTree);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct DirTree {
     relpath: EntryPath,
     children: HashMap<String, TreeNode>,
-    checksum_cache: RefCell<Option<DirChecksum>>,
 }
-
-impl PartialEq for DirTree {
-    fn eq(&self, other: &DirTree) -> bool {
-        // Don't compare checksum_cache
-        (&self.relpath, &self.children) == (&other.relpath, &other.children)
-    }
-}
-
-impl Eq for DirTree {}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum TreeNode {
@@ -57,8 +47,7 @@ impl ChecksumTree {
     /// Add the checksum for a file to the tree
     pub fn add_file(&mut self, node: FileChecksum) -> Result<(), ChecksumTreeError> {
         let mut d = &mut self.0.children;
-        let nodepath = node.relpath().clone();
-        for parent in nodepath.parents() {
+        for parent in node.relpath().parents() {
             match d
                 .entry(parent.file_name().to_string())
                 .or_insert_with(|| TreeNode::directory(parent.clone()))
@@ -69,23 +58,10 @@ impl ChecksumTree {
                 TreeNode::Directory(DirTree { children, .. }) => d = children,
             }
         }
-        match d.entry(nodepath.file_name().to_string()) {
-            Entry::Occupied(_) => return Err(ChecksumTreeError::DoubleAdd { path: nodepath }),
+        match d.entry(node.relpath().file_name().to_string()) {
+            Entry::Occupied(_) => return Err(ChecksumTreeError::DoubleAdd { path: node.relpath }),
             Entry::Vacant(v) => {
                 v.insert(TreeNode::File(node));
-            }
-        }
-        // TODO: Try to merge this into the loop above:
-        let mut dt = &self.0;
-        dt.clear_cache();
-        for parent in nodepath.parents() {
-            match dt.children.get(parent.file_name()) {
-                None => panic!("Directory suddenly disappeared"),
-                Some(TreeNode::File(_)) => panic!("Directory suddenly turned into a File"),
-                Some(TreeNode::Directory(dt2)) => {
-                    dt = dt2;
-                    dt.clear_cache();
-                }
             }
         }
         Ok(())
@@ -102,6 +78,19 @@ impl ChecksumTree {
         }
         Ok(zarr)
     }
+
+    pub fn into_termtree(self) -> termtree::Tree<TermTreeNode> {
+        let (_, tree) = self.0.into_termtree();
+        let termtree::Tree {
+            root: TermTreeNode::Directory { checksum, .. },
+            leaves,
+            ..
+        } = tree
+        else {
+            panic!("Root of termtree::Tree should be a directory");
+        };
+        termtree::Tree::new(TermTreeNode::Root { checksum }).with_leaves(leaves)
+    }
 }
 
 impl Default for ChecksumTree {
@@ -115,35 +104,51 @@ impl DirTree {
         DirTree {
             relpath,
             children: HashMap::new(),
-            checksum_cache: RefCell::new(None),
         }
     }
 
     fn to_checksum(&self) -> DirChecksum {
-        self.checksum_cache
-            .borrow_mut()
-            .get_or_insert_with(|| {
-                get_checksum(
-                    self.relpath.clone(),
-                    self.children.values().map(TreeNode::to_checksum),
-                )
-            })
-            .clone()
+        let mut ds = Dirsummer::new(self.relpath.clone());
+        ds.extend(self.children.values().map(TreeNode::to_checksum));
+        ds.checksum()
     }
 
-    fn clear_cache(&self) {
-        _ = self.checksum_cache.borrow_mut().take();
+    fn into_termtree(self) -> (DirChecksum, termtree::Tree<TermTreeNode>) {
+        let name = self.relpath.file_name().to_string();
+        let mut children = self.children.into_iter().collect::<Vec<_>>();
+        children.sort_by_key(|(k, _)| k.clone());
+        let mut ds = Dirsummer::new(self.relpath);
+        let mut leaves = Vec::with_capacity(children.len());
+        for (_, child) in children {
+            match child {
+                TreeNode::File(fc) => {
+                    leaves.push(termtree::Tree::new(TermTreeNode::File {
+                        name: fc.name().to_string(),
+                        checksum: fc.checksum().to_string(),
+                    }));
+                    ds.push(fc);
+                }
+                TreeNode::Directory(dt) => {
+                    let (dircheck, subtree) = dt.into_termtree();
+                    leaves.push(subtree);
+                    ds.push(dircheck);
+                }
+            }
+        }
+        let dircheck = ds.checksum();
+        let checksum = dircheck.checksum().to_string();
+        (
+            dircheck,
+            termtree::Tree::new(TermTreeNode::Directory { name, checksum }).with_leaves(leaves),
+        )
     }
 }
 
 impl From<DirTree> for DirChecksum {
     fn from(dirtree: DirTree) -> DirChecksum {
-        dirtree.checksum_cache.take().unwrap_or_else(|| {
-            get_checksum(
-                dirtree.relpath,
-                dirtree.children.into_values().map(EntryChecksum::from),
-            )
-        })
+        let mut ds = Dirsummer::new(dirtree.relpath);
+        ds.extend(dirtree.children.into_values().map(EntryChecksum::from));
+        ds.checksum()
     }
 }
 
@@ -169,26 +174,20 @@ impl From<TreeNode> for EntryChecksum {
     }
 }
 
-impl From<ChecksumTree> for termtree::Tree<String> {
-    fn from(chktree: ChecksumTree) -> termtree::Tree<String> {
-        let chksum = chktree.checksum();
-        let mut children = chktree.0.children.into_iter().collect::<Vec<_>>();
-        children.sort_by_key(|(k, _)| k.clone());
-        termtree::Tree::new(chksum).with_leaves(children.into_iter().map(|(_, v)| v))
-    }
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TermTreeNode {
+    Root { checksum: String },
+    Directory { name: String, checksum: String },
+    File { name: String, checksum: String },
 }
 
-impl From<TreeNode> for termtree::Tree<String> {
-    fn from(node: TreeNode) -> termtree::Tree<String> {
-        match node {
-            TreeNode::File(f) => termtree::Tree::new(format!("{} = {}", f.name(), f.checksum())),
-            TreeNode::Directory(d) => {
-                let chksum = d.to_checksum();
-                let mut children = d.children.into_iter().collect::<Vec<_>>();
-                children.sort_by_key(|(k, _)| k.clone());
-                termtree::Tree::new(format!("{}/ = {}", chksum.name(), chksum.checksum()))
-                    .with_leaves(children.into_iter().map(|(_, v)| v))
-            }
+impl fmt::Display for TermTreeNode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use TermTreeNode::*;
+        match self {
+            Root { checksum } => write!(f, "{checksum}"),
+            Directory { name, checksum } => write!(f, "{name}/ = {checksum}"),
+            File { name, checksum } => write!(f, "{name} = {checksum}"),
         }
     }
 }
@@ -289,40 +288,6 @@ mod test {
     }
 
     #[test]
-    fn test_dirtree_eq() {
-        let a = DirTree {
-            relpath: "foo/bar/baz".try_into().unwrap(),
-            children: HashMap::from([(
-                "glarch".into(),
-                TreeNode::File(FileChecksum {
-                    relpath: "foo/bar/baz/glarch".try_into().unwrap(),
-                    checksum: "e20297935e73dd0154104d4ea53040ab".into(),
-                    size: 24,
-                }),
-            )]),
-            checksum_cache: RefCell::new(None),
-        };
-        let b = DirTree {
-            relpath: "foo/bar/baz".try_into().unwrap(),
-            children: HashMap::from([(
-                "glarch".into(),
-                TreeNode::File(FileChecksum {
-                    relpath: "foo/bar/baz/glarch".try_into().unwrap(),
-                    checksum: "e20297935e73dd0154104d4ea53040ab".into(),
-                    size: 24,
-                }),
-            )]),
-            checksum_cache: RefCell::new(Some(DirChecksum {
-                relpath: "foo/bar/baz".try_into().unwrap(),
-                checksum: "2606add1822870a6d0f892da6503e720-1--24".into(),
-                size: 24,
-                file_count: 1,
-            })),
-        };
-        assert_eq!(a, b);
-    }
-
-    #[test]
     fn test_draw_tree() {
         let files = vec![
             FileChecksum {
@@ -352,7 +317,7 @@ mod test {
             },
         ];
         let sample = ChecksumTree::from_files(files).unwrap();
-        let drawing = termtree::Tree::from(sample).to_string();
+        let drawing = sample.into_termtree().to_string();
         assert_eq!(
             drawing,
             concat!(
@@ -376,7 +341,7 @@ mod test {
             size: 315,
         }];
         let sample = ChecksumTree::from_files(files).unwrap();
-        let drawing = termtree::Tree::from(sample).to_string();
+        let drawing = sample.into_termtree().to_string();
         assert_eq!(
             drawing,
             concat!(

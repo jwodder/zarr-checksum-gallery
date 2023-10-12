@@ -163,6 +163,15 @@ impl ZarrDirectory {
         Ok(entries)
     }
 
+    pub fn dirsummer(&self) -> Dirsummer {
+        let relpath = match &self.relpath {
+            // TODO: Replace this kludgy workaround with something better:
+            DirPath::Root => EntryPath::try_from("<root>").unwrap(),
+            DirPath::Path(ep) => ep.clone(),
+        };
+        Dirsummer::new(relpath)
+    }
+
     /// Compute the checksum for the directory from the given checksums for the
     /// directory's entries.
     ///
@@ -174,12 +183,9 @@ impl ZarrDirectory {
     where
         I: IntoIterator<Item = EntryChecksum>,
     {
-        let relpath = match &self.relpath {
-            // TODO: Replace this kludgy workaround with something better:
-            DirPath::Root => EntryPath::try_from("<root>").unwrap(),
-            DirPath::Path(ep) => ep.clone(),
-        };
-        get_checksum(relpath, nodes)
+        let mut ds = self.dirsummer();
+        ds.extend(nodes);
+        ds.checksum()
     }
 }
 

@@ -1,7 +1,11 @@
 use super::nodes::*;
 use std::fmt::{Error, Write};
 
-pub(super) fn get_checksum_json(files: Vec<FileChecksum>, directories: Vec<DirChecksum>) -> String {
+pub(super) fn get_checksum_json<'a, FI, DI>(files: FI, directories: DI) -> String
+where
+    FI: IntoIterator<Item = &'a FileChecksum>,
+    DI: IntoIterator<Item = &'a DirChecksum>,
+{
     let mut filevec = files.into_iter().map(JSONEntry::from).collect::<Vec<_>>();
     filevec.sort();
     let mut dirvec = directories
@@ -19,51 +23,51 @@ pub(super) fn get_checksum_json(files: Vec<FileChecksum>, directories: Vec<DirCh
     buf
 }
 
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-struct JSONEntry {
-    name: String,
-    digest: String,
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+struct JSONEntry<'a> {
+    name: &'a str,
+    digest: &'a str,
     size: u64,
 }
 
-impl JSONEntry {
+impl<'a> JSONEntry<'a> {
     fn write_json<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_str(r#"{"digest":"#)?;
-        write_json_str(&self.digest, writer)?;
+        write_json_str(self.digest, writer)?;
         writer.write_str(r#","name":"#)?;
-        write_json_str(&self.name, writer)?;
+        write_json_str(self.name, writer)?;
         write!(writer, r#","size":{}}}"#, self.size)?;
         Ok(())
     }
 }
 
-impl From<FileChecksum> for JSONEntry {
-    fn from(node: FileChecksum) -> JSONEntry {
+impl<'a> From<&'a FileChecksum> for JSONEntry<'a> {
+    fn from(node: &'a FileChecksum) -> JSONEntry<'a> {
         JSONEntry {
-            name: node.name().to_string(),
-            digest: node.checksum,
+            name: node.name(),
+            digest: node.checksum(),
             size: node.size,
         }
     }
 }
 
-impl From<DirChecksum> for JSONEntry {
-    fn from(node: DirChecksum) -> JSONEntry {
+impl<'a> From<&'a DirChecksum> for JSONEntry<'a> {
+    fn from(node: &'a DirChecksum) -> JSONEntry<'a> {
         JSONEntry {
-            name: node.name().to_string(),
-            digest: node.checksum,
+            name: node.name(),
+            digest: node.checksum(),
             size: node.size,
         }
     }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-struct JSONEntryCollection {
-    directories: Vec<JSONEntry>,
-    files: Vec<JSONEntry>,
+struct JSONEntryCollection<'a> {
+    directories: Vec<JSONEntry<'a>>,
+    files: Vec<JSONEntry<'a>>,
 }
 
-impl JSONEntryCollection {
+impl<'a> JSONEntryCollection<'a> {
     fn write_json<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_str(r#"{"directories":["#)?;
         for (i, d) in self.directories.iter().enumerate() {
@@ -148,7 +152,7 @@ mod test {
             size: 65537,
             file_count: 23,
         }]);
-        let json = get_checksum_json(files, directories);
+        let json = get_checksum_json(files.iter(), directories.iter());
         assert_eq!(
             json,
             r#"{"directories":[{"digest":"0987654321fedcba0987654321fedcba-23--65537","name":"quux","size":65537}],"files":[{"digest":"abcdef0123456789abcdef0123456789","name":"bar","size":42},{"digest":"0123456789abcdef0123456789abcdef","name":"foo","size":69105}]}"#
@@ -164,7 +168,7 @@ mod test {
             size: 0,
             file_count: 0,
         }];
-        let json = get_checksum_json(files, directories);
+        let json = get_checksum_json(files.iter(), directories.iter());
         assert_eq!(json, r#"{"directories":[],"files":[]}"#);
     }
 }

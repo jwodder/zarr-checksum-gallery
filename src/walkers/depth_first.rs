@@ -4,7 +4,7 @@ use crate::zarr::*;
 
 struct OpenDir {
     handle: Entries,
-    entries: Directory,
+    summer: Dirsummer,
 }
 
 impl OpenDir {
@@ -12,34 +12,8 @@ impl OpenDir {
         let handle = dir.iter_entries()?;
         Ok(OpenDir {
             handle,
-            entries: Directory::new(dir),
+            summer: dir.dirsummer(),
         })
-    }
-}
-
-struct Directory {
-    dir: ZarrDirectory,
-    nodes: Vec<EntryChecksum>,
-}
-
-impl Directory {
-    fn new(dir: ZarrDirectory) -> Directory {
-        Directory {
-            dir,
-            nodes: Vec::new(),
-        }
-    }
-
-    fn checksum(self) -> DirChecksum {
-        self.dir.get_checksum(self.nodes)
-    }
-
-    fn add_file(&mut self, node: FileChecksum) {
-        self.nodes.push(node.into());
-    }
-
-    fn add_directory(&mut self, zdir: Directory) {
-        self.nodes.push(zdir.checksum().into());
     }
 }
 
@@ -53,13 +27,13 @@ pub fn depth_first_checksum(zarr: &Zarr) -> Result<String, ChecksumError> {
         let topdir = dirstack.last_mut().unwrap();
         match topdir.handle.next() {
             Some(Ok(ZarrEntry::Directory(zd))) => dirstack.push(OpenDir::new(zd)?),
-            Some(Ok(ZarrEntry::File(zf))) => topdir.entries.add_file(zf.into_checksum()?),
+            Some(Ok(ZarrEntry::File(zf))) => topdir.summer.push(zf.into_checksum()?),
             Some(Err(e)) => return Err(e.into()),
             None => {
-                let OpenDir { entries, .. } = dirstack.pop().unwrap();
+                let OpenDir { summer, .. } = dirstack.pop().unwrap();
                 match dirstack.last_mut() {
-                    Some(od) => od.entries.add_directory(entries),
-                    None => return Ok(entries.checksum().into_checksum()),
+                    Some(od) => od.summer.push(summer.checksum()),
+                    None => return Ok(summer.checksum().into_checksum()),
                 }
             }
         }
