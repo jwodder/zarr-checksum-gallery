@@ -36,6 +36,10 @@ Usage
 
     zarr-checksum-gallery [<global options>] <implementation> [<options>] <dirpath>
 
+or, if running a localized binary:
+
+    cargo run [--release] -- [<global options>] <implementation> [<options>] <dirpath>
+
 `zarr-checksum-gallery` computes the Zarr checksum for the directory at
 `<dirpath>` using the given `<implementation>` (See list below).  Regardless of
 the implementation chosen, the checksum should always be the same for the same
