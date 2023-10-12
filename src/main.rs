@@ -36,8 +36,9 @@ enum Command {
         dirpath: PathBuf,
     },
     /// Do a multithreaded directory traversal, computing directory checksums
-    /// as soon as possible
-    Collapsio {
+    /// as soon as possible, with intermediate results reported using shared
+    /// memory
+    CollapsioArc {
         /// Set the number of threads to use
         #[clap(short, long, default_value_t = default_jobs())]
         threads: NonZeroUsize,
@@ -45,7 +46,10 @@ enum Command {
         /// Path to the directory to checksum
         dirpath: PathBuf,
     },
-    Collapsio0 {
+    /// Do a multithreaded directory traversal, computing directory checksums
+    /// as soon as possible, with intermediate results reported over
+    /// synchronized channels
+    CollapsioMpsc {
         /// Set the number of threads to use
         #[clap(short, long, default_value_t = default_jobs())]
         threads: NonZeroUsize,
@@ -118,11 +122,11 @@ impl Arguments {
             Command::BreadthFirst { dirpath } => {
                 breadth_first_checksum(&Zarr::new(dirpath).exclude_dotfiles(self.exclude_dotfiles))
             }
-            Command::Collapsio { threads, dirpath } => collapsio_checksum(
+            Command::CollapsioArc { threads, dirpath } => collapsio_arc_checksum(
                 &Zarr::new(dirpath).exclude_dotfiles(self.exclude_dotfiles),
                 threads,
             ),
-            Command::Collapsio0 { threads, dirpath } => collapsio0_checksum(
+            Command::CollapsioMpsc { threads, dirpath } => collapsio_mpsc_checksum(
                 &Zarr::new(dirpath).exclude_dotfiles(self.exclude_dotfiles),
                 threads,
             ),

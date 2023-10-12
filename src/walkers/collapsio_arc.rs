@@ -157,10 +157,11 @@ impl fmt::Debug for DirectoryData {
 
 /// Traverse & checksum a Zarr directory using a stack of jobs distributed over
 /// multiple threads.  The checksum for each intermediate directory is computed
-/// as a job as soon as possible.
+/// as a job as soon as possible.  Checksums for directory entries are passed
+/// to parent jobs via shared memory implemented using `Arc<Mutex<...>>`.
 ///
 /// The `threads` argument determines the number of worker threads to use.
-pub fn collapsio0_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<String, ChecksumError> {
+pub fn collapsio_arc_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<String, ChecksumError> {
     let stack = Arc::new(JobStack::new([Job::mkroot(zarr)]));
     let (sender, receiver) = channel();
     for i in 0..threads.get() {

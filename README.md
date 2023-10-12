@@ -63,8 +63,18 @@ Implementations
 - `breadth-first` — Walk the directory tree iteratively & breadth-first,
   building a tree of file checksums in memory
 
-- `collapsio` — Walk the directory tree using multiple threads, computing the
-  checksum for each directory as soon as possible
+- `collapsio-arc` — Walk the directory tree using multiple threads, computing
+  the checksum for each directory as soon as possible, with intermediate
+  results reported using shared memory
+
+  **Options:**
+
+    - `-t <NUM>`/`--threads <NUM>` — Set the number of threads to use.  The
+      default value is the number of logical CPU cores on the machine.
+
+- `collapsio-mpsc` — Walk the directory tree using multiple threads, computing
+  the checksum for each directory as soon as possible, with intermediate
+  results reported over synchronized channels
 
   **Options:**
 
@@ -107,17 +117,19 @@ Implementations
       default value is the number of logical CPU cores on the machine.
 
 
-Performance
-===========
+Comparative Performance
+=======================
 
-Preliminary timings show the following:
+Typical final output from a run of `time-all.sh` on a 1.59 GiB directory of
+7084 files:
 
-- `fastio` is consistently the fastest implementation.
+    collapsio-arc ran
+      1.06 ± 0.06 times faster than fastio
+      1.31 ± 0.14 times faster than collapsio-mpsc
+      6.18 ± 0.07 times faster than depth-first
+      6.28 ± 0.10 times faster than breadth-first
+      6.35 ± 0.22 times faster than recursive
+      6.41 ± 0.24 times faster than fastasync
 
-- `collapsio` is sometimes faster than `fastio`, but it has a much larger
-  variance, and its average runtime is slightly above that of `fastio`.
-
-    - Note that `collapsio` should have a smaller memory footprint than
-      `fastio`, but this has not yet been tested.
-
-- All other implementations are about 5 to 6 times slower than `fastio`.
+Note that the collapsio implementations should have some of the smallest memory
+footprints, but this has not yet been tested.
