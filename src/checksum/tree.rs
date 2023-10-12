@@ -116,7 +116,7 @@ impl DirTree {
     fn into_termtree(self) -> (DirChecksum, termtree::Tree<TermTreeNode>) {
         let name = self.relpath.file_name().to_string();
         let mut children = self.children.into_iter().collect::<Vec<_>>();
-        children.sort_by_key(|(k, _)| k.clone());
+        children.sort_unstable_by(|p1, p2| p1.0.cmp(&p2.0));
         let mut ds = Dirsummer::new(self.relpath);
         let mut leaves = Vec::with_capacity(children.len());
         for (_, child) in children {

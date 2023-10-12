@@ -7,13 +7,13 @@ where
     DI: IntoIterator<Item = &'a DirChecksum>,
 {
     let mut filevec = files.into_iter().map(JSONEntry::from).collect::<Vec<_>>();
-    filevec.sort();
+    filevec.sort_unstable();
     let mut dirvec = directories
         .into_iter()
         .filter(|node| node.file_count > 0)
         .map(JSONEntry::from)
         .collect::<Vec<_>>();
-    dirvec.sort();
+    dirvec.sort_unstable();
     let collection = JSONEntryCollection {
         directories: dirvec,
         files: filevec,
