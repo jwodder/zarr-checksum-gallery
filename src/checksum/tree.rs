@@ -123,10 +123,9 @@ impl DirTree {
         self.checksum_cache
             .borrow_mut()
             .get_or_insert_with(|| {
-                get_checksum(
-                    self.relpath.clone(),
-                    self.children.values().map(TreeNode::to_checksum),
-                )
+                let mut ds = Dirsummer::new(self.relpath.clone());
+                ds.extend(self.children.values().map(TreeNode::to_checksum));
+                ds.checksum()
             })
             .clone()
     }
@@ -139,10 +138,9 @@ impl DirTree {
 impl From<DirTree> for DirChecksum {
     fn from(dirtree: DirTree) -> DirChecksum {
         dirtree.checksum_cache.take().unwrap_or_else(|| {
-            get_checksum(
-                dirtree.relpath,
-                dirtree.children.into_values().map(EntryChecksum::from),
-            )
+            let mut ds = Dirsummer::new(dirtree.relpath);
+            ds.extend(dirtree.children.into_values().map(EntryChecksum::from));
+            ds.checksum()
         })
     }
 }

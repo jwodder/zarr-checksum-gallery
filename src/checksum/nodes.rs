@@ -193,131 +193,20 @@ impl Dirsummer {
     }
 }
 
-/// Compute the checksum for the directory at relative path `relpath` within a
-/// Zarr, where the entries of the directory have the checksums supplied in
-/// `iter`.
-///
-/// It is the caller's responsibility to ensure that `iter` contains all & only
-/// entries from the given directory and that no two items in `iter` have the
-/// same [`name`][Checksum::name].  If this condition is not met,
-/// `get_checksum()` will return an inaccurate value.
-pub(crate) fn get_checksum<I>(relpath: EntryPath, iter: I) -> DirChecksum
-where
-    I: IntoIterator<Item = EntryChecksum>,
-{
-    let mut files = Vec::new();
-    let mut directories = Vec::new();
-    let mut size = 0;
-    let mut file_count = 0;
-    for node in iter {
-        size += node.size();
-        file_count += node.file_count();
-        match node {
-            EntryChecksum::File(f) => files.push(f),
-            EntryChecksum::Directory(d) => directories.push(d),
+impl<N: Into<EntryChecksum>> Extend<N> for Dirsummer {
+    fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = N>,
+    {
+        for node in iter {
+            self.push(node);
         }
-    }
-    let md5 = md5_string(&get_checksum_json(files.iter(), directories.iter()));
-    let checksum = format!("{md5}-{file_count}--{size}");
-    debug!("Computed checksum for directory {relpath}: {checksum}");
-    DirChecksum {
-        relpath,
-        checksum,
-        size,
-        file_count,
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::iter::empty;
-
-    #[test]
-    fn test_get_checksum_nothing() {
-        let checksum = get_checksum("foo".try_into().unwrap(), empty());
-        assert_eq!(checksum.checksum, "481a2f77ab786a0f45aafd5db0971caa-0--0");
-    }
-
-    #[test]
-    fn test_get_checksum_one_file() {
-        let nodes = vec![EntryChecksum::File(FileChecksum {
-            relpath: "bar".try_into().unwrap(),
-            checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
-            size: 1,
-        })];
-        let checksum = get_checksum("foo".try_into().unwrap(), nodes);
-        assert_eq!(checksum.checksum, "f21b9b4bf53d7ce1167bcfae76371e59-1--1");
-    }
-
-    #[test]
-    fn test_get_checksum_one_directory() {
-        let nodes = vec![EntryChecksum::Directory(DirChecksum {
-            relpath: "bar".try_into().unwrap(),
-            checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-1--1".into(),
-            size: 1,
-            file_count: 1,
-        })];
-        let checksum = get_checksum("foo".try_into().unwrap(), nodes);
-        assert_eq!(checksum.checksum, "ea8b8290b69b96422a3ed1cca0390f21-1--1");
-    }
-
-    #[test]
-    fn test_get_checksum_two_files() {
-        let nodes = vec![
-            EntryChecksum::File(FileChecksum {
-                relpath: "bar".try_into().unwrap(),
-                checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
-                size: 1,
-            }),
-            EntryChecksum::File(FileChecksum {
-                relpath: "baz".try_into().unwrap(),
-                checksum: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
-                size: 1,
-            }),
-        ];
-        let checksum = get_checksum("foo".try_into().unwrap(), nodes);
-        assert_eq!(checksum.checksum, "8e50add2b46d3a6389e2d9d0924227fb-2--2");
-    }
-
-    #[test]
-    fn test_get_checksum_two_directories() {
-        let nodes = vec![
-            EntryChecksum::Directory(DirChecksum {
-                relpath: "bar".try_into().unwrap(),
-                checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-1--1".into(),
-                size: 1,
-                file_count: 1,
-            }),
-            EntryChecksum::Directory(DirChecksum {
-                relpath: "baz".try_into().unwrap(),
-                checksum: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-1--1".into(),
-                size: 1,
-                file_count: 1,
-            }),
-        ];
-        let checksum = get_checksum("foo".try_into().unwrap(), nodes);
-        assert_eq!(checksum.checksum, "4c21a113688f925240549b14136d61ff-2--2");
-    }
-
-    #[test]
-    fn test_get_checksum_one_of_each() {
-        let nodes = vec![
-            EntryChecksum::File(FileChecksum {
-                relpath: "baz".try_into().unwrap(),
-                checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
-                size: 1,
-            }),
-            EntryChecksum::Directory(DirChecksum {
-                relpath: "bar".try_into().unwrap(),
-                checksum: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-1--1".into(),
-                size: 1,
-                file_count: 1,
-            }),
-        ];
-        let checksum = get_checksum("foo".try_into().unwrap(), nodes);
-        assert_eq!(checksum.checksum, "d5e4eb5dc8efdb54ff089db1eef34119-2--2");
-    }
 
     #[test]
     fn test_dirsummer_nothing() {

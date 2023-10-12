@@ -26,12 +26,12 @@ pub fn recursive_checksum(zarr: &Zarr) -> Result<String, ChecksumError> {
 }
 
 fn recurse(zdir: ZarrDirectory) -> Result<DirChecksum, FSError> {
-    let mut nodes: Vec<EntryChecksum> = Vec::new();
+    let mut ds = zdir.dirsummer();
     for entry in zdir.entries()? {
         match entry {
-            ZarrEntry::File(f) => nodes.push(f.into_checksum()?.into()),
-            ZarrEntry::Directory(d) => nodes.push(recurse(d)?.into()),
+            ZarrEntry::File(f) => ds.push(f.into_checksum()?),
+            ZarrEntry::Directory(d) => ds.push(recurse(d)?),
         }
     }
-    Ok(zdir.get_checksum(nodes))
+    Ok(ds.checksum())
 }
