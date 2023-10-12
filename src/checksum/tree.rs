@@ -3,6 +3,7 @@ use crate::errors::ChecksumTreeError;
 use crate::zarr::EntryPath;
 use std::cell::RefCell;
 use std::collections::{hash_map::Entry, HashMap};
+use std::fmt;
 
 /// A tree of [`FileChecksum`]s, for computing the final checksum for an entire
 /// Zarr one file at a time
@@ -102,6 +103,19 @@ impl ChecksumTree {
         }
         Ok(zarr)
     }
+
+    pub fn into_termtree(self) -> termtree::Tree<TermTreeNode> {
+        let (_, tree) = self.0.into_termtree();
+        let termtree::Tree {
+            root: TermTreeNode::Directory { checksum, .. },
+            leaves,
+            ..
+        } = tree
+        else {
+            panic!("Root of termtree::Tree should be a directory");
+        };
+        termtree::Tree::new(TermTreeNode::Root { checksum }).with_leaves(leaves)
+    }
 }
 
 impl Default for ChecksumTree {
@@ -132,6 +146,36 @@ impl DirTree {
 
     fn clear_cache(&self) {
         _ = self.checksum_cache.borrow_mut().take();
+    }
+
+    fn into_termtree(self) -> (DirChecksum, termtree::Tree<TermTreeNode>) {
+        let name = self.relpath.file_name().to_string();
+        let mut children = self.children.into_iter().collect::<Vec<_>>();
+        children.sort_by_key(|(k, _)| k.clone());
+        let mut ds = Dirsummer::new(self.relpath);
+        let mut leaves = Vec::with_capacity(children.len());
+        for (_, child) in children {
+            match child {
+                TreeNode::File(fc) => {
+                    leaves.push(termtree::Tree::new(TermTreeNode::File {
+                        name: fc.name().to_string(),
+                        checksum: fc.checksum().to_string(),
+                    }));
+                    ds.push(fc);
+                }
+                TreeNode::Directory(dt) => {
+                    let (dircheck, subtree) = dt.into_termtree();
+                    leaves.push(subtree);
+                    ds.push(dircheck);
+                }
+            }
+        }
+        let dircheck = ds.checksum();
+        let checksum = dircheck.checksum().to_string();
+        (
+            dircheck,
+            termtree::Tree::new(TermTreeNode::Directory { name, checksum }).with_leaves(leaves),
+        )
     }
 }
 
@@ -167,26 +211,20 @@ impl From<TreeNode> for EntryChecksum {
     }
 }
 
-impl From<ChecksumTree> for termtree::Tree<String> {
-    fn from(chktree: ChecksumTree) -> termtree::Tree<String> {
-        let chksum = chktree.checksum();
-        let mut children = chktree.0.children.into_iter().collect::<Vec<_>>();
-        children.sort_by_key(|(k, _)| k.clone());
-        termtree::Tree::new(chksum).with_leaves(children.into_iter().map(|(_, v)| v))
-    }
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TermTreeNode {
+    Root { checksum: String },
+    Directory { name: String, checksum: String },
+    File { name: String, checksum: String },
 }
 
-impl From<TreeNode> for termtree::Tree<String> {
-    fn from(node: TreeNode) -> termtree::Tree<String> {
-        match node {
-            TreeNode::File(f) => termtree::Tree::new(format!("{} = {}", f.name(), f.checksum())),
-            TreeNode::Directory(d) => {
-                let chksum = d.to_checksum();
-                let mut children = d.children.into_iter().collect::<Vec<_>>();
-                children.sort_by_key(|(k, _)| k.clone());
-                termtree::Tree::new(format!("{}/ = {}", chksum.name(), chksum.checksum()))
-                    .with_leaves(children.into_iter().map(|(_, v)| v))
-            }
+impl fmt::Display for TermTreeNode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use TermTreeNode::*;
+        match self {
+            Root { checksum } => write!(f, "{checksum}"),
+            Directory { name, checksum } => write!(f, "{name}/ = {checksum}"),
+            File { name, checksum } => write!(f, "{name} = {checksum}"),
         }
     }
 }
@@ -350,7 +388,7 @@ mod test {
             },
         ];
         let sample = ChecksumTree::from_files(files).unwrap();
-        let drawing = termtree::Tree::from(sample).to_string();
+        let drawing = sample.into_termtree().to_string();
         assert_eq!(
             drawing,
             concat!(
@@ -374,7 +412,7 @@ mod test {
             size: 315,
         }];
         let sample = ChecksumTree::from_files(files).unwrap();
-        let drawing = termtree::Tree::from(sample).to_string();
+        let drawing = sample.into_termtree().to_string();
         assert_eq!(
             drawing,
             concat!(

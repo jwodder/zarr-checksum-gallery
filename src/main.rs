@@ -148,7 +148,7 @@ impl Arguments {
                 &Zarr::new(dirpath).exclude_dotfiles(self.exclude_dotfiles),
                 threads,
             )
-            .map(|chktree| termtree::Tree::from(chktree).to_string()),
+            .map(|chktree| chktree.into_termtree().to_string()),
         }
     }
 }
