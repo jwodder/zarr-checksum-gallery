@@ -109,7 +109,11 @@ fn empty_dir() -> Option<TestCase> {
 fn file_arg() -> Option<TestCase> {
     let tmpfile = NamedTempFile::new().unwrap();
     let path = tmpfile.path().to_path_buf();
-    let checker = move |e| assert_matches!(e, ChecksumError::FSError(FSError::ReaddirError { path: epath, .. }) if path == epath);
+    let checker = move |e| {
+        assert_matches!(e, ChecksumError::FSError(FSError::ReaddirError { path: epath, .. }) => {
+            assert_eq!(path, epath);
+        })
+    };
     // Unstable:
     //assert_eq!(source.kind(), std::io::ErrorKind::NotADirectory);
     Some(TestCase {
@@ -255,7 +259,11 @@ fn unreadable_file() -> Option<TestCase> {
     path.push("unreadable");
     fs::write(&path, "You will never see this.\n").unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
-    let checker = move |e| assert_matches!(e, ChecksumError::FSError(FSError::MD5FileError { path: epath, .. }) if path == epath);
+    let checker = move |e| {
+        assert_matches!(e, ChecksumError::FSError(FSError::MD5FileError { path: epath, .. }) => {
+            assert_eq!(path, epath);
+        })
+    };
     Some(TestCase {
         input: Input::Temporary(tmp_path),
         expected: Expected::Error(Box::new(checker)),
@@ -275,7 +283,9 @@ fn unreadable_dir() -> Option<TestCase> {
         // Make the directory readable again so that the temp dir can be
         // cleaned up:
         fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
-        assert_matches!(e, ChecksumError::FSError(FSError::ReaddirError { path: epath, .. }) if path == epath);
+        assert_matches!(e, ChecksumError::FSError(FSError::ReaddirError { path: epath, .. }) => {
+            assert_eq!(path, epath);
+        });
     };
     Some(TestCase {
         input: Input::Temporary(tmp_path),
@@ -295,7 +305,11 @@ fn bad_filename() -> Option<TestCase> {
         // on such platforms.
         return None;
     }
-    let checker = move |e| assert_matches!(e, ChecksumError::FSError(FSError::UndecodableName { path: epath }) if path == epath);
+    let checker = move |e| {
+        assert_matches!(e, ChecksumError::FSError(FSError::UndecodableName { path: epath }) => {
+            assert_eq!(path, epath);
+        })
+    };
     Some(TestCase {
         input: Input::Temporary(tmp_path),
         expected: Expected::Error(Box::new(checker)),
@@ -315,7 +329,11 @@ fn bad_dirname() -> Option<TestCase> {
         return None;
     }
     fs::write(badpath.join("somefile"), "This is a file.\n").unwrap();
-    let checker = move |e| assert_matches!(e, ChecksumError::FSError(FSError::UndecodableName { path: epath }) if epath == badpath);
+    let checker = move |e| {
+        assert_matches!(e, ChecksumError::FSError(FSError::UndecodableName { path: epath }) => {
+            assert_eq!(epath, badpath);
+        })
+    };
     Some(TestCase {
         input: Input::Temporary(tmp_path),
         expected: Expected::Error(Box::new(checker)),
