@@ -9,22 +9,22 @@ use zarr_checksum_gallery::*;
 
 /// Compute the Dandi Zarr checksum for a directory
 #[derive(Clone, Debug, Eq, Parser, PartialEq)]
-#[clap(version)]
+#[command(version)]
 struct Arguments {
     /// Show DEBUG log messages
-    #[clap(long)]
+    #[arg(long)]
     debug: bool,
 
     /// Exclude special dotfiles from checksumming
-    #[clap(short = 'E', long)]
+    #[arg(short = 'E', long)]
     exclude_dotfiles: bool,
 
     /// Show TRACE log messages
-    #[clap(long)]
+    #[arg(long)]
     trace: bool,
 
     /// The tree-traversal implementation to use
-    #[clap(subcommand)]
+    #[command(subcommand)]
     command: Command,
 }
 
@@ -40,7 +40,7 @@ enum Command {
     /// memory
     CollapsioArc {
         /// Set the number of threads to use
-        #[clap(short, long, default_value_t = default_jobs())]
+        #[arg(short, long, default_value_t = default_jobs())]
         threads: NonZeroUsize,
 
         /// Path to the directory to checksum
@@ -51,7 +51,7 @@ enum Command {
     /// synchronized channels
     CollapsioMpsc {
         /// Set the number of threads to use
-        #[clap(short, long, default_value_t = default_jobs())]
+        #[arg(short, long, default_value_t = default_jobs())]
         threads: NonZeroUsize,
 
         /// Path to the directory to checksum
@@ -66,11 +66,11 @@ enum Command {
     /// Do an asynchronous directory traversal and build a tree of checksums
     Fastasync {
         /// Set the number of threads for the async runtime to use
-        #[clap(short, long, default_value_t = default_jobs())]
+        #[arg(short, long, default_value_t = default_jobs())]
         threads: NonZeroUsize,
 
         /// Set the number of worker tasks to use
-        #[clap(short, long, default_value_t = default_jobs())]
+        #[arg(short, long, default_value_t = default_jobs())]
         workers: NonZeroUsize,
 
         /// Path to the directory to checksum
@@ -79,7 +79,7 @@ enum Command {
     /// Do a multithreaded directory traversal and build a tree of checksums
     Fastio {
         /// Set the number of threads to use
-        #[clap(short, long, default_value_t = default_jobs())]
+        #[arg(short, long, default_value_t = default_jobs())]
         threads: NonZeroUsize,
 
         /// Path to the directory to checksum
@@ -93,7 +93,7 @@ enum Command {
     /// Do a multithreaded directory traversal and draw a tree of checksums
     Tree {
         /// Set the number of threads to use
-        #[clap(short, long, default_value_t = default_jobs())]
+        #[arg(short, long, default_value_t = default_jobs())]
         threads: NonZeroUsize,
 
         /// Path to the directory to checksum
