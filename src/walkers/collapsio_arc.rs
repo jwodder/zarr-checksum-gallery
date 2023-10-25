@@ -33,11 +33,13 @@ impl Job {
                         );
                         Output::ToPush(vec![Job::CompletedDir(arcdir)])
                     } else {
+                        let qty = entries.len();
                         Output::ToPush(
                             entries
                                 .into_iter()
                                 .inspect(|n| trace!("[{i}] Pushing {n:?} onto stack"))
-                                .map(|n| Job::Entry(n, Some(Arc::clone(&arcdir))))
+                                .zip(arc_times_n(arcdir, qty))
+                                .map(|(n, arc)| Job::Entry(n, Some(arc)))
                                 .collect(),
                         )
                     }
@@ -220,4 +222,13 @@ pub fn collapsio_arc_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<Stri
             }
         },
     }
+}
+
+fn arc_times_n<T>(arc: Arc<T>, n: usize) -> Vec<Arc<T>> {
+    let mut vec = Vec::with_capacity(n);
+    for _ in 0..(n.saturating_sub(1)) {
+        vec.push(arc.clone());
+    }
+    vec.push(arc);
+    vec
 }
