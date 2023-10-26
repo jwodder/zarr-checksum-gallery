@@ -226,9 +226,11 @@ pub fn collapsio_arc_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<Stri
 
 fn arc_times_n<T>(arc: Arc<T>, n: usize) -> Vec<Arc<T>> {
     let mut vec = Vec::with_capacity(n);
-    for _ in 0..(n.saturating_sub(1)) {
-        vec.push(arc.clone());
+    if let Some(m) = n.checked_sub(1) {
+        for _ in 0..m {
+            vec.push(arc.clone());
+        }
+        vec.push(arc);
     }
-    vec.push(arc);
     vec
 }
