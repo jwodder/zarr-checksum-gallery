@@ -2,8 +2,7 @@ use crate::errors::FSError;
 use fs_err::{tokio::File as TokioFile, File};
 use md5::{Digest, Md5};
 use std::path::Path;
-use tokio_stream::StreamExt;
-use tokio_util::io::ReaderStream;
+use tokio::io::AsyncReadExt;
 
 /// Compute the MD5 hash of a string (encoded in UTF-8) and return the hash as
 /// a string of lowercase hexadecimal digits
@@ -28,14 +27,23 @@ pub(crate) fn md5_file<P: AsRef<Path>>(path: P) -> Result<String, FSError> {
 /// returning a string of lowercase hexadecimal digits
 pub(crate) async fn async_md5_file<P: AsRef<Path>>(path: P) -> Result<String, FSError> {
     let path = path.as_ref();
-    let fp = TokioFile::open(path).await?;
-    let mut stream = ReaderStream::new(fp);
+    let mut fp = TokioFile::open(path).await?;
     let mut hasher = Md5::new();
-    while let Some(chunk) = stream.next().await {
-        hasher.update(chunk.map_err(|source| FSError::Digest {
-            path: path.into(),
-            source,
-        })?);
+    let mut buffer = bytes::BytesMut::with_capacity(4096);
+    loop {
+        match fp.read_buf(&mut buffer).await {
+            Ok(0) => break,
+            Ok(_) => {
+                hasher.update(&buffer);
+                buffer.clear();
+            }
+            Err(source) => {
+                return Err(FSError::Digest {
+                    path: path.into(),
+                    source,
+                })
+            }
+        }
     }
     Ok(hex::encode(hasher.finalize()))
 }
