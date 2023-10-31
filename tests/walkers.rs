@@ -1,10 +1,8 @@
-extern crate rstest_reuse;
-
 use assert_matches::assert_matches;
 use cfg_if::cfg_if;
 use fs_extra::dir;
 use rstest::rstest;
-use rstest_reuse::{apply, template};
+use rstest_reuse::{self, apply, template};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::thread::available_parallelism;
