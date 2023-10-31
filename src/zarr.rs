@@ -4,14 +4,11 @@ use crate::checksum::nodes::*;
 use crate::errors::{EntryNameError, FSError};
 use crate::util::{async_md5_file, md5_file};
 pub use entrypath::*;
+use fs_err::{metadata, read_dir, tokio as afs, DirEntry, ReadDir};
 use log::debug;
 use std::ffi::OsStr;
 use std::fmt;
-use std::fs;
 use std::path::{Path, PathBuf};
-use tokio::fs as afs;
-use tokio_stream::wrappers::ReadDirStream;
-use tokio_stream::StreamExt;
 
 /// Names of files & directories that are excluded from consideration when
 /// traversing a Zarr
@@ -71,19 +68,14 @@ impl ZarrFile {
     }
 
     pub fn into_checksum(self) -> Result<FileChecksum, FSError> {
-        let size = fs::metadata(&self.path)
-            .map_err(|e| FSError::stat_error(&self.path, e))?
-            .len();
+        let size = metadata(&self.path)?.len();
         let checksum = md5_file(self.path)?;
         debug!("Computed checksum for file {}: {checksum}", &self.relpath);
         Ok(FileChecksum::new(self.relpath, checksum, size))
     }
 
     pub async fn async_into_checksum(self) -> Result<FileChecksum, FSError> {
-        let size = afs::metadata(&self.path)
-            .await
-            .map_err(|e| FSError::stat_error(&self.path, e))?
-            .len();
+        let size = afs::metadata(&self.path).await?.len();
         let checksum = async_md5_file(self.path).await?;
         debug!("Computed checksum for file {}: {checksum}", &self.relpath);
         Ok(FileChecksum::new(self.relpath, checksum, size))
@@ -111,10 +103,9 @@ impl ZarrDirectory {
     }
 
     pub fn iter_entries(&self) -> Result<Entries, FSError> {
-        let handle = fs::read_dir(&self.path).map_err(|e| FSError::readdir_error(&self.path, e))?;
+        let handle = read_dir(&self.path)?;
         Ok(Entries {
             handle,
-            basepath: self.path.clone(),
             baserelpath: self.relpath.clone(),
             exclude_dotfiles: self.exclude_dotfiles,
         })
@@ -122,33 +113,23 @@ impl ZarrDirectory {
 
     pub async fn async_entries(&self) -> Result<Vec<ZarrEntry>, FSError> {
         let mut entries = Vec::new();
-        let handle = afs::read_dir(&self.path)
-            .await
-            .map_err(|e| FSError::readdir_error(&self.path, e))?;
-        let mut stream = ReadDirStream::new(handle);
-        while let Some(p) = stream.next().await {
-            let p = p.map_err(|e| FSError::readdir_error(&self.path, e))?;
+        let mut handle = afs::read_dir(&self.path).await?;
+        while let Some(p) = handle.next_entry().await.transpose() {
+            let p = p?;
             let path = p.path();
             if self.exclude_dotfiles && is_excluded_dotfile(&path) {
                 debug!("Excluding special dotfile {path:?}");
                 continue;
             }
-            let ftype = p
-                .file_type()
-                .await
-                .map_err(|e| FSError::stat_error(&path, e))?;
-            let is_dir = ftype.is_dir()
-                || (ftype.is_symlink()
-                    && afs::metadata(&path)
-                        .await
-                        .map_err(|e| FSError::stat_error(&path, e))?
-                        .is_dir());
+            let ftype = p.file_type().await?;
+            let is_dir =
+                ftype.is_dir() || (ftype.is_symlink() && afs::metadata(&path).await?.is_dir());
             let relpath = match p.file_name().to_str() {
                 Some(s) => self
                     .relpath
                     .join1(s)
                     .expect("DirEntry.file_name() should not be . or .. nor contain /"),
-                None => return Err(FSError::undecodable_name(path)),
+                None => return Err(FSError::UndecodableName { path }),
             };
             entries.push(if is_dir {
                 ZarrEntry::Directory(ZarrDirectory {
@@ -192,27 +173,22 @@ impl ZarrDirectory {
 }
 
 pub struct Entries {
-    handle: fs::ReadDir,
-    basepath: PathBuf,
+    handle: ReadDir,
     baserelpath: DirPath,
     exclude_dotfiles: bool,
 }
 
 impl Entries {
-    fn process_direntry(&self, p: fs::DirEntry) -> Result<ZarrEntry, FSError> {
+    fn process_direntry(&self, p: DirEntry) -> Result<ZarrEntry, FSError> {
         let path = p.path();
-        let ftype = p.file_type().map_err(|e| FSError::stat_error(&path, e))?;
-        let is_dir = ftype.is_dir()
-            || (ftype.is_symlink()
-                && fs::metadata(&path)
-                    .map_err(|e| FSError::stat_error(&path, e))?
-                    .is_dir());
+        let ftype = p.file_type()?;
+        let is_dir = ftype.is_dir() || (ftype.is_symlink() && metadata(&path)?.is_dir());
         let relpath = match p.file_name().to_str() {
             Some(s) => self
                 .baserelpath
                 .join1(s)
                 .expect("DirEntry.file_name() should not be . or .. nor contain /"),
-            None => return Err(FSError::undecodable_name(path)),
+            None => return Err(FSError::UndecodableName { path }),
         };
         Ok(if is_dir {
             ZarrEntry::Directory(ZarrDirectory {
@@ -240,7 +216,7 @@ impl Iterator for Entries {
                     }
                     self.process_direntry(p)
                 }
-                Err(e) => Err(FSError::readdir_error(&self.basepath, e)),
+                Err(e) => Err(e.into()),
             });
         }
     }

@@ -108,12 +108,13 @@ fn file_arg() -> Option<TestCase> {
     let tmpfile = NamedTempFile::new().unwrap();
     let path = tmpfile.path().to_path_buf();
     let checker = move |e| {
-        assert_matches!(e, ChecksumError::FSError(FSError::ReaddirError { path: epath, .. }) => {
-            assert_eq!(path, epath);
+        assert_matches!(e, ChecksumError::FSError(FSError::Io(source)) => {
+            // Unstable:
+            //assert_eq!(source.kind(), std::io::ErrorKind::NotADirectory);
+            let msg = source.to_string();
+            assert!(msg.starts_with(&format!("failed to read directory `{}`", path.display())), "IO error message: {msg:?}");
         })
     };
-    // Unstable:
-    //assert_eq!(source.kind(), std::io::ErrorKind::NotADirectory);
     Some(TestCase {
         input: Input::TempFile(tmpfile),
         expected: Expected::Error(Box::new(checker)),
@@ -258,8 +259,9 @@ fn unreadable_file() -> Option<TestCase> {
     fs::write(&path, "You will never see this.\n").unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
     let checker = move |e| {
-        assert_matches!(e, ChecksumError::FSError(FSError::MD5FileError { path: epath, .. }) => {
-            assert_eq!(path, epath);
+        assert_matches!(e, ChecksumError::FSError(FSError::Io(source)) => {
+            let msg = source.to_string();
+            assert!(msg.starts_with(&format!("failed to open file `{}`", path.display())), "IO error message: {msg:?}");
         })
     };
     Some(TestCase {
@@ -281,8 +283,9 @@ fn unreadable_dir() -> Option<TestCase> {
         // Make the directory readable again so that the temp dir can be
         // cleaned up:
         fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
-        assert_matches!(e, ChecksumError::FSError(FSError::ReaddirError { path: epath, .. }) => {
-            assert_eq!(path, epath);
+        assert_matches!(e, ChecksumError::FSError(FSError::Io(source)) => {
+            let msg = source.to_string();
+            assert!(msg.starts_with(&format!("failed to read directory `{}`", path.display())), "IO error message: {msg:?}");
         });
     };
     Some(TestCase {

@@ -1,7 +1,6 @@
 //! Error types
 use crate::zarr::EntryPath;
-use std::io;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use thiserror::Error;
 
 /// Error returned when something goes wrong while interacting with the
@@ -10,50 +9,17 @@ use thiserror::Error;
 pub enum FSError {
     /// Returned when an error occurs while trying to compute the MD5 digest of
     /// a filepath
-    #[error("error digesting file: {}: {source}", .path.display())]
-    MD5FileError { path: PathBuf, source: io::Error },
+    #[error("failed to digest contents of {}", .path.display())]
+    Digest {
+        path: PathBuf,
+        source: std::io::Error,
+    },
 
     #[error("final component of path {path:?} is not valid UTF-8")]
     UndecodableName { path: PathBuf },
 
-    /// Returned when an error occurs while trying to fetch a path's filesystem
-    /// metadata
-    #[error("error stat'ing file: {}: {source}", .path.display())]
-    StatError { path: PathBuf, source: io::Error },
-
-    /// Returned when an error occurs while trying to list the contents of a
-    /// directory
-    #[error("error reading directory: {}: {source}", .path.display())]
-    ReaddirError { path: PathBuf, source: io::Error },
-}
-
-impl FSError {
-    pub(crate) fn md5_file_error<P: AsRef<Path>>(path: P, source: io::Error) -> Self {
-        FSError::MD5FileError {
-            path: path.as_ref().into(),
-            source,
-        }
-    }
-
-    pub(crate) fn undecodable_name<P: AsRef<Path>>(path: P) -> Self {
-        FSError::UndecodableName {
-            path: path.as_ref().into(),
-        }
-    }
-
-    pub(crate) fn stat_error<P: AsRef<Path>>(path: P, source: io::Error) -> Self {
-        FSError::StatError {
-            path: path.as_ref().into(),
-            source,
-        }
-    }
-
-    pub(crate) fn readdir_error<P: AsRef<Path>>(path: P, source: io::Error) -> Self {
-        FSError::ReaddirError {
-            path: path.as_ref().into(),
-            source,
-        }
-    }
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 }
 
 /// Error for failure to construct a
