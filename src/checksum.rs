@@ -1,7 +1,7 @@
 //! Functionality for computing Zarr checksums
 //!
-//! The checksum for a file is respresented by a [`FileChecksum`], which
-//! can be obtained via the
+//! The checksum for a file is represented by a [`FileChecksum`], which can be
+//! obtained via the
 //! [`ZarrFile::into_checksum()`][crate::zarr::ZarrFile::into_checksum]
 //! function.  The checksum for a directory whose entries have all had their
 //! checksums calculated is represented by a [`DirChecksum`], which can be

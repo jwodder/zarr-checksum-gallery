@@ -13,7 +13,7 @@ pub enum FSError {
     #[error("error digesting file: {}: {source}", .path.display())]
     MD5FileError { path: PathBuf, source: io::Error },
 
-    #[error("final componenet of path {path:?} is not valid UTF-8")]
+    #[error("final component of path {path:?} is not valid UTF-8")]
     UndecodableName { path: PathBuf },
 
     /// Returned when an error occurs while trying to fetch a path's filesystem
