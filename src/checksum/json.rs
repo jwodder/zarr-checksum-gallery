@@ -19,7 +19,9 @@ where
         files: filevec,
     };
     let mut buf = String::new();
-    collection.write_json(&mut buf).unwrap();
+    collection
+        .write_json(&mut buf)
+        .expect("formatting a String should not fail");
     buf
 }
 

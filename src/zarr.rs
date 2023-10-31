@@ -166,7 +166,9 @@ impl ZarrDirectory {
     pub fn dirsummer(&self) -> Dirsummer {
         let relpath = match &self.relpath {
             // TODO: Replace this kludgy workaround with something better:
-            DirPath::Root => EntryPath::try_from("<root>").unwrap(),
+            DirPath::Root => {
+                EntryPath::try_from("<root>").expect("<root> should be a valid EntryPath")
+            }
             DirPath::Path(ep) => ep.clone(),
         };
         Dirsummer::new(relpath)
@@ -271,7 +273,9 @@ pub enum DirPath {
 impl DirPath {
     pub fn join1(&self, s: &str) -> Result<EntryPath, EntryNameError> {
         match self {
-            DirPath::Root if is_path_name(s) => Ok(EntryPath::try_from(s).unwrap()),
+            DirPath::Root if is_path_name(s) => {
+                Ok(EntryPath::try_from(s).expect("path names should be valid EntryPaths"))
+            }
             DirPath::Path(ep) => ep.join1(s),
             _ => Err(EntryNameError(String::from(s))),
         }

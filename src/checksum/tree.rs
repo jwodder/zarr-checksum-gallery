@@ -31,7 +31,11 @@ enum TreeNode {
 impl ChecksumTree {
     /// Create a new `ChecksumTree`
     pub fn new() -> Self {
-        ChecksumTree(DirTree::new("<root>".try_into().unwrap()))
+        ChecksumTree(DirTree::new(
+            "<root>"
+                .try_into()
+                .expect("<root> should be avalid EntryPath"),
+        ))
     }
 
     /// Compute the Zarr checksum for the entire tree

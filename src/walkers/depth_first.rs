@@ -24,13 +24,13 @@ impl OpenDir {
 pub fn depth_first_checksum(zarr: &Zarr) -> Result<String, ChecksumError> {
     let mut dirstack = vec![OpenDir::new(zarr.root_dir())?];
     loop {
-        let topdir = dirstack.last_mut().unwrap();
+        let topdir = dirstack.last_mut().expect("dirstack should be nonempty");
         match topdir.handle.next() {
             Some(Ok(ZarrEntry::Directory(zd))) => dirstack.push(OpenDir::new(zd)?),
             Some(Ok(ZarrEntry::File(zf))) => topdir.summer.push(zf.into_checksum()?),
             Some(Err(e)) => return Err(e.into()),
             None => {
-                let OpenDir { summer, .. } = dirstack.pop().unwrap();
+                let OpenDir { summer, .. } = dirstack.pop().expect("dirstack should be nonempty");
                 match dirstack.last_mut() {
                     Some(od) => od.summer.push(summer.checksum()),
                     None => return Ok(summer.checksum().into_checksum()),

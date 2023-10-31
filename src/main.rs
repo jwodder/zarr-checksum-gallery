@@ -117,7 +117,7 @@ impl Arguments {
             .level(log_level)
             .chain(std::io::stderr())
             .apply()
-            .unwrap();
+            .expect("no other logger should have been previously initialized");
         match self.command {
             Command::BreadthFirst { dirpath } => {
                 breadth_first_checksum(&Zarr::new(dirpath).exclude_dotfiles(self.exclude_dotfiles))
