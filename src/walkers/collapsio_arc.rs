@@ -21,14 +21,14 @@ impl Job {
         Job::Entry(ZarrEntry::Directory(zarr.root_dir()), None)
     }
 
-    fn process(self, i: usize) -> Output {
+    fn process(self, thread_no: usize) -> Output {
         match self {
             Job::Entry(ZarrEntry::Directory(zd), parent) => match zd.entries() {
                 Ok(entries) => {
                     let arcdir = Arc::new(Directory::new(zd, entries.len(), parent));
                     if entries.is_empty() {
                         trace!(
-                            "[{i}] Directory {:?} is empty; pushing onto stack",
+                            "[{thread_no}] Directory {:?} is empty; pushing onto stack",
                             arcdir.relpath()
                         );
                         Output::ToPush(vec![Job::CompletedDir(arcdir)])
@@ -37,7 +37,7 @@ impl Job {
                         Output::ToPush(
                             entries
                                 .into_iter()
-                                .inspect(|n| trace!("[{i}] Pushing {n:?} onto stack"))
+                                .inspect(|n| trace!("[{thread_no}] Pushing {n:?} onto stack"))
                                 .zip(arc_times_n(arcdir, qty))
                                 .map(|(n, arc)| Job::Entry(n, Some(arc)))
                                 .collect(),
@@ -54,7 +54,7 @@ impl Job {
                 let parent = parent.expect("File without a parent directory");
                 if parent.add(node.into()) {
                     trace!(
-                        "[{i}] Computed all checksums within directory {}; pushing onto stack",
+                        "[{thread_no}] Computed all checksums within directory {}; pushing onto stack",
                         parent.relpath()
                     );
                     Output::ToPush(vec![Job::CompletedDir(parent)])
@@ -76,7 +76,7 @@ impl Job {
                 if let Some(parent) = parent {
                     if parent.add(node.into()) {
                         trace!(
-                            "[{i}] Computed all checksums within directory {}; pushing onto stack",
+                            "[{thread_no}] Computed all checksums within directory {}; pushing onto stack",
                             parent.relpath()
                         );
                         Output::ToPush(vec![Job::CompletedDir(parent)])
@@ -166,14 +166,14 @@ impl fmt::Debug for DirectoryData {
 pub fn collapsio_arc_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<String, ChecksumError> {
     let stack = Arc::new(JobStack::new([Job::mkroot(zarr)]));
     let (sender, receiver) = channel();
-    for i in 0..threads.get() {
+    for thread_no in 0..threads.get() {
         let stack = Arc::clone(&stack);
         let sender = sender.clone();
         thread::spawn(move || {
-            trace!("[{i}] Starting thread");
+            trace!("[{thread_no}] Starting thread");
             for entry in from_fn(|| stack.pop()) {
-                trace!("[{i}] Popped {entry:?} from stack");
-                let out = entry.process(i);
+                trace!("[{thread_no}] Popped {entry:?} from stack");
+                let out = entry.process(thread_no);
                 stack.job_done();
                 match out {
                     Output::ToPush(to_push) => stack.extend(to_push),
@@ -183,9 +183,9 @@ pub fn collapsio_arc_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<Stri
                             if to_send.is_err() {
                                 stack.shutdown();
                             }
-                            trace!("[{i}] Sending {to_send:?} to output");
+                            trace!("[{thread_no}] Sending {to_send:?} to output");
                             if sender.send(to_send).is_err() {
-                                warn!("[{i}] Failed to send; exiting");
+                                warn!("[{thread_no}] Failed to send; exiting");
                                 stack.shutdown();
                                 return;
                             }
@@ -194,7 +194,7 @@ pub fn collapsio_arc_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<Stri
                     Output::Nil => (),
                 }
             }
-            trace!("[{i}] Ending thread");
+            trace!("[{thread_no}] Ending thread");
         });
     }
     drop(sender);

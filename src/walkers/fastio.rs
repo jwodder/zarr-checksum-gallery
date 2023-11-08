@@ -26,20 +26,20 @@ pub fn fastio_checksum_tree(
 ) -> Result<ChecksumTree, ChecksumError> {
     let stack = Arc::new(JobStack::new([ZarrEntry::Directory(zarr.root_dir())]));
     let (sender, receiver) = channel();
-    for i in 0..threads.get() {
+    for thread_no in 0..threads.get() {
         let stack = Arc::clone(&stack);
         let sender = sender.clone();
         thread::spawn(move || {
-            trace!("[{i}] Starting thread");
+            trace!("[{thread_no}] Starting thread");
             for entry in from_fn(|| stack.pop()) {
-                trace!("[{i}] Popped {:?} from stack", entry);
+                trace!("[{thread_no}] Popped {:?} from stack", entry);
                 let output = match entry {
                     ZarrEntry::Directory(zd) => match zd.entries() {
                         Ok(entries) => {
                             stack.extend(
                                 entries
                                     .into_iter()
-                                    .inspect(|n| trace!("[{i}] Pushing {n:?} onto stack")),
+                                    .inspect(|n| trace!("[{thread_no}] Pushing {n:?} onto stack")),
                             );
                             None
                         }
@@ -54,11 +54,11 @@ pub fn fastio_checksum_tree(
                         if v.is_err() {
                             stack.shutdown();
                         }
-                        trace!("[{i}] Sending {v:?} to output");
+                        trace!("[{thread_no}] Sending {v:?} to output");
                         match sender.send(v) {
                             Ok(_) => (),
                             Err(_) => {
-                                warn!("[{i}] Failed to send; exiting");
+                                warn!("[{thread_no}] Failed to send; exiting");
                                 stack.shutdown();
                                 return;
                             }
@@ -66,7 +66,7 @@ pub fn fastio_checksum_tree(
                     }
                 }
             }
-            trace!("[{i}] Ending thread");
+            trace!("[{thread_no}] Ending thread");
         });
     }
     drop(sender);

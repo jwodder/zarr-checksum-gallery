@@ -113,20 +113,20 @@ pub async fn fastasync_checksum(
 ) -> Result<String, ChecksumError> {
     let stack = Arc::new(AsyncJobStack::new([ZarrEntry::Directory(zarr.root_dir())]));
     let (sender, mut receiver) = channel(64);
-    for i in 0..workers.get() {
+    for task_no in 0..workers.get() {
         let stack = Arc::clone(&stack);
         let sender = sender.clone();
         tokio::spawn(async move {
-            trace!("[{i}] Starting worker");
+            trace!("[{task_no}] Starting worker");
             while let Some(entry) = stack.pop().await {
-                trace!("[{i}] Popped {:?} from stack", entry);
+                trace!("[{task_no}] Popped {:?} from stack", entry);
                 let output = match entry {
                     ZarrEntry::Directory(zd) => match zd.async_entries().await {
                         Ok(entries) => {
                             stack.extend(
                                 entries
                                     .into_iter()
-                                    .inspect(|n| trace!("[{i}] Pushing {n:?} onto stack")),
+                                    .inspect(|n| trace!("[{task_no}] Pushing {n:?} onto stack")),
                             );
                             None
                         }
@@ -141,11 +141,11 @@ pub async fn fastasync_checksum(
                         if v.is_err() {
                             stack.shutdown();
                         }
-                        trace!("[{i}] Sending {v:?} to output");
+                        trace!("[{task_no}] Sending {v:?} to output");
                         match sender.send(v).await {
                             Ok(_) => (),
                             Err(_) => {
-                                warn!("[{i}] Failed to send; exiting");
+                                warn!("[{task_no}] Failed to send; exiting");
                                 stack.shutdown();
                                 return;
                             }
@@ -153,7 +153,7 @@ pub async fn fastasync_checksum(
                     }
                 }
             }
-            trace!("[{i}] Ending worker");
+            trace!("[{task_no}] Ending worker");
         });
     }
     drop(sender);
