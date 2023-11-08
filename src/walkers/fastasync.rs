@@ -1,7 +1,6 @@
 use crate::checksum::ChecksumTree;
 use crate::errors::ChecksumError;
 use crate::zarr::*;
-use log::{trace, warn};
 use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::channel;
@@ -40,7 +39,7 @@ impl<T> AsyncJobStack<T> {
         if !data.shutdown {
             data.queue.push(item);
             data.jobs += 1;
-            trace!("Job count incremented to {}", data.jobs);
+            log::trace!("Job count incremented to {}", data.jobs);
             self.cond.notify_one();
         }
     }
@@ -52,7 +51,7 @@ impl<T> AsyncJobStack<T> {
             let prelen = data.queue.len();
             data.queue.extend(iter);
             data.jobs += data.queue.len() - prelen;
-            trace!("Job count incremented to {}", data.jobs);
+            log::trace!("Job count incremented to {}", data.jobs);
             self.cond.notify_waiters();
         }
     }
@@ -60,7 +59,7 @@ impl<T> AsyncJobStack<T> {
     fn shutdown(&self) {
         let mut data = self.data.lock().unwrap();
         if !data.shutdown {
-            trace!("Shutting down stack");
+            log::trace!("Shutting down stack");
             data.jobs -= data.queue.len();
             data.queue.clear();
             data.shutdown = true;
@@ -74,18 +73,18 @@ impl<T> AsyncJobStack<T> {
 
     async fn pop(&self) -> Option<T> {
         loop {
-            trace!("Looping through pop()");
+            log::trace!("Looping through pop()");
             {
                 let mut data = self.data.lock().unwrap();
                 if data.jobs == 0 || data.shutdown {
-                    trace!("[pop] no jobs; returning None");
+                    log::trace!("[pop] no jobs; returning None");
                     return None;
                 }
                 if let Some(v) = data.queue.pop() {
                     return Some(v);
                 }
             }
-            trace!("[pop] queue is empty; waiting");
+            log::trace!("[pop] queue is empty; waiting");
             self.cond.notified().await;
         }
     }
@@ -93,7 +92,7 @@ impl<T> AsyncJobStack<T> {
     fn job_done(&self) {
         let mut data = self.data.lock().unwrap();
         data.jobs -= 1;
-        trace!("Job count decremented to {}", data.jobs);
+        log::trace!("Job count decremented to {}", data.jobs);
         if data.jobs == 0 {
             self.cond.notify_waiters();
         }
@@ -117,23 +116,22 @@ pub async fn fastasync_checksum(
         let stack = Arc::clone(&stack);
         let sender = sender.clone();
         tokio::spawn(async move {
-            trace!("[{task_no}] Starting worker");
+            log::trace!("[{task_no}] Starting worker");
             while let Some(entry) = stack.pop().await {
-                trace!("[{task_no}] Popped {:?} from stack", entry);
-                let output = match entry {
-                    ZarrEntry::Directory(zd) => match zd.async_entries().await {
-                        Ok(entries) => {
-                            stack.extend(
-                                entries
-                                    .into_iter()
-                                    .inspect(|n| trace!("[{task_no}] Pushing {n:?} onto stack")),
-                            );
-                            None
-                        }
-                        Err(e) => Some(Err(e)),
-                    },
-                    ZarrEntry::File(zf) => Some(zf.async_into_checksum().await),
-                };
+                log::trace!("[{task_no}] Popped {:?} from stack", entry);
+                let output =
+                    match entry {
+                        ZarrEntry::Directory(zd) => match zd.async_entries().await {
+                            Ok(entries) => {
+                                stack.extend(entries.into_iter().inspect(|n| {
+                                    log::trace!("[{task_no}] Pushing {n:?} onto stack")
+                                }));
+                                None
+                            }
+                            Err(e) => Some(Err(e)),
+                        },
+                        ZarrEntry::File(zf) => Some(zf.async_into_checksum().await),
+                    };
                 stack.job_done();
                 if let Some(v) = output {
                     // If we've shut down, don't send anything except Errs
@@ -141,11 +139,11 @@ pub async fn fastasync_checksum(
                         if v.is_err() {
                             stack.shutdown();
                         }
-                        trace!("[{task_no}] Sending {v:?} to output");
+                        log::trace!("[{task_no}] Sending {v:?} to output");
                         match sender.send(v).await {
                             Ok(_) => (),
                             Err(_) => {
-                                warn!("[{task_no}] Failed to send; exiting");
+                                log::warn!("[{task_no}] Failed to send; exiting");
                                 stack.shutdown();
                                 return;
                             }
@@ -153,7 +151,7 @@ pub async fn fastasync_checksum(
                     }
                 }
             }
-            trace!("[{task_no}] Ending worker");
+            log::trace!("[{task_no}] Ending worker");
         });
     }
     drop(sender);

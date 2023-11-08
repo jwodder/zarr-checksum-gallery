@@ -5,7 +5,6 @@ use crate::errors::{EntryNameError, FSError};
 use crate::util::{async_md5_file, md5_file};
 pub use entrypath::*;
 use fs_err::{metadata, read_dir, tokio as afs, DirEntry, ReadDir};
-use log::debug;
 use std::ffi::OsStr;
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -70,14 +69,14 @@ impl ZarrFile {
     pub fn into_checksum(self) -> Result<FileChecksum, FSError> {
         let size = metadata(&self.path)?.len();
         let checksum = md5_file(self.path)?;
-        debug!("Computed checksum for file {}: {checksum}", &self.relpath);
+        log::debug!("Computed checksum for file {}: {checksum}", &self.relpath);
         Ok(FileChecksum::new(self.relpath, checksum, size))
     }
 
     pub async fn async_into_checksum(self) -> Result<FileChecksum, FSError> {
         let size = afs::metadata(&self.path).await?.len();
         let checksum = async_md5_file(self.path).await?;
-        debug!("Computed checksum for file {}: {checksum}", &self.relpath);
+        log::debug!("Computed checksum for file {}: {checksum}", &self.relpath);
         Ok(FileChecksum::new(self.relpath, checksum, size))
     }
 }
@@ -118,7 +117,7 @@ impl ZarrDirectory {
             let p = p?;
             let path = p.path();
             if self.exclude_dotfiles && is_excluded_dotfile(&path) {
-                debug!("Excluding special dotfile {path:?}");
+                log::debug!("Excluding special dotfile {path:?}");
                 continue;
             }
             let ftype = p.file_type().await?;
@@ -211,7 +210,7 @@ impl Iterator for Entries {
                 Ok(p) => {
                     let path = p.path();
                     if self.exclude_dotfiles && is_excluded_dotfile(&path) {
-                        debug!("Excluding special dotfile {path:?}");
+                        log::debug!("Excluding special dotfile {path:?}");
                         continue;
                     }
                     self.process_direntry(p)

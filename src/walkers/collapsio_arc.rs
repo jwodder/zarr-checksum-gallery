@@ -3,7 +3,6 @@ use crate::checksum::nodes::*;
 use crate::errors::{ChecksumError, FSError};
 use crate::zarr::*;
 use crossbeam::sync::WaitGroup;
-use log::{error, trace, warn};
 use std::fmt;
 use std::iter::from_fn;
 use std::num::NonZeroUsize;
@@ -28,7 +27,7 @@ impl Job {
                 Ok(entries) => {
                     let arcdir = SharedDirectory::new(Directory::new(zd, entries.len(), parent));
                     if entries.is_empty() {
-                        trace!(
+                        log::trace!(
                             "[{thread_no}] Directory {:?} is empty; pushing onto stack",
                             arcdir.relpath()
                         );
@@ -37,7 +36,7 @@ impl Job {
                         Output::ToPush(
                             entries
                                 .into_iter()
-                                .inspect(|n| trace!("[{thread_no}] Pushing {n:?} onto stack"))
+                                .inspect(|n| log::trace!("[{thread_no}] Pushing {n:?} onto stack"))
                                 .map(|n| Job::Entry(n, Some(arcdir.clone())))
                                 .collect(),
                         )
@@ -52,7 +51,7 @@ impl Job {
                 };
                 let parent = parent.expect("File without a parent directory");
                 if parent.add(node.into()) {
-                    trace!(
+                    log::trace!(
                         "[{thread_no}] Computed all checksums within directory {}; pushing onto stack",
                         parent.relpath()
                     );
@@ -76,7 +75,7 @@ impl Job {
                 let node = dir.checksum();
                 if let Some(parent) = parent {
                     if parent.add(node.into()) {
-                        trace!(
+                        log::trace!(
                             "[{thread_no}] Computed all checksums within directory {}; pushing onto stack",
                             parent.relpath()
                         );
@@ -107,7 +106,7 @@ struct Directory {
 
 impl Directory {
     fn new(dir: ZarrDirectory, todo: usize, parent: Option<SharedDirectory>) -> Directory {
-        trace!(
+        log::trace!(
             "Directory {:?} has {} entries to checksum",
             dir.relpath(),
             todo
@@ -135,7 +134,7 @@ impl Directory {
         let mut data = self.data.lock().unwrap();
         data.nodes.push(node);
         data.todo = data.todo.saturating_sub(1);
-        trace!(
+        log::trace!(
             "Directory {:?} now has {} entries left to checksum",
             self.relpath(),
             data.todo
@@ -177,7 +176,7 @@ impl SharedDirectory {
         match Arc::try_unwrap(self.data) {
             Ok(dir) => dir,
             Err(arcdir) => {
-                error!("Expected SharedDirectory to have only one strong reference, but there were {}!", Arc::strong_count(&arcdir));
+                log::error!("Expected SharedDirectory to have only one strong reference, but there were {}!", Arc::strong_count(&arcdir));
                 panic!("SharedDirectory should have only one strong reference");
             }
         }
@@ -205,9 +204,9 @@ pub fn collapsio_arc_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<Stri
         let stack = Arc::clone(&stack);
         let sender = sender.clone();
         thread::spawn(move || {
-            trace!("[{thread_no}] Starting thread");
+            log::trace!("[{thread_no}] Starting thread");
             for entry in from_fn(|| stack.pop()) {
-                trace!("[{thread_no}] Popped {entry:?} from stack");
+                log::trace!("[{thread_no}] Popped {entry:?} from stack");
                 let out = entry.process(thread_no);
                 stack.job_done();
                 match out {
@@ -218,9 +217,9 @@ pub fn collapsio_arc_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<Stri
                             if to_send.is_err() {
                                 stack.shutdown();
                             }
-                            trace!("[{thread_no}] Sending {to_send:?} to output");
+                            log::trace!("[{thread_no}] Sending {to_send:?} to output");
                             if sender.send(to_send).is_err() {
-                                warn!("[{thread_no}] Failed to send; exiting");
+                                log::warn!("[{thread_no}] Failed to send; exiting");
                                 stack.shutdown();
                                 return;
                             }
@@ -229,7 +228,7 @@ pub fn collapsio_arc_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<Stri
                     Output::Nil => (),
                 }
             }
-            trace!("[{thread_no}] Ending thread");
+            log::trace!("[{thread_no}] Ending thread");
         });
     }
     drop(sender);
@@ -252,7 +251,7 @@ pub fn collapsio_arc_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<Stri
         None => match chksum {
             Some(s) => Ok(s),
             None => {
-                error!("Neither checksum nor errors were received!");
+                log::error!("Neither checksum nor errors were received!");
                 panic!("Neither checksum nor errors were received!");
             }
         },

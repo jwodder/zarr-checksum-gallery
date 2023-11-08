@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-use log::trace;
 use std::ops::Deref;
 use std::sync::{Condvar, Mutex};
 
@@ -33,7 +32,7 @@ impl<T> JobStack<T> {
         if !data.shutdown {
             data.queue.push(item);
             data.jobs += 1;
-            trace!("[JobStack] Job count incremented to {}", data.jobs);
+            log::trace!("[JobStack] Job count incremented to {}", data.jobs);
             self.cond.notify_one();
         }
     }
@@ -45,7 +44,7 @@ impl<T> JobStack<T> {
             let prelen = data.queue.len();
             data.queue.extend(iter);
             data.jobs += data.queue.len() - prelen;
-            trace!("[JobStack] Job count incremented to {}", data.jobs);
+            log::trace!("[JobStack] Job count incremented to {}", data.jobs);
             self.cond.notify_all();
         }
     }
@@ -53,7 +52,7 @@ impl<T> JobStack<T> {
     pub(crate) fn shutdown(&self) {
         let mut data = self.data.lock().unwrap();
         if !data.shutdown {
-            trace!("[JobStack] Shutting down stack");
+            log::trace!("[JobStack] Shutting down stack");
             data.jobs -= data.queue.len();
             data.queue.clear();
             data.shutdown = true;
@@ -68,15 +67,15 @@ impl<T> JobStack<T> {
     pub(crate) fn pop(&self) -> Option<T> {
         let mut data = self.data.lock().unwrap();
         loop {
-            trace!("[JobStack] Looping through stack");
+            log::trace!("[JobStack] Looping through stack");
             if data.jobs == 0 || data.shutdown {
-                trace!("[JobStack] no jobs; returning None");
+                log::trace!("[JobStack] no jobs; returning None");
                 return None;
             }
             match data.queue.pop() {
                 value @ Some(_) => return value,
                 None => {
-                    trace!("[JobStack] queue is empty; waiting");
+                    log::trace!("[JobStack] queue is empty; waiting");
                     data = self.cond.wait(data).unwrap();
                 }
             }
@@ -86,7 +85,7 @@ impl<T> JobStack<T> {
     pub(crate) fn job_done(&self) {
         let mut data = self.data.lock().unwrap();
         data.jobs -= 1;
-        trace!("[JobStack] Job count decremented to {}", data.jobs);
+        log::trace!("[JobStack] Job count decremented to {}", data.jobs);
         if data.jobs == 0 {
             self.cond.notify_all();
         }

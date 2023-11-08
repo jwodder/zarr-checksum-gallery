@@ -2,7 +2,6 @@ use super::json::get_checksum_json;
 use crate::util::md5_string;
 use crate::zarr::EntryPath;
 use enum_dispatch::enum_dispatch;
-use log::debug;
 
 /// Trait for behavior shared by [`FileChecksum`] and [`DirChecksum`]
 #[enum_dispatch]
@@ -180,9 +179,10 @@ impl Dirsummer {
             self.directories.iter(),
         ));
         let checksum = format!("{}-{}--{}", md5, self.file_count, self.size);
-        debug!(
+        log::debug!(
             "Computed checksum for directory {}: {}",
-            self.relpath, checksum
+            self.relpath,
+            checksum
         );
         DirChecksum {
             relpath: self.relpath.clone(),

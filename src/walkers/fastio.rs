@@ -2,7 +2,6 @@ use super::jobstack::JobStack;
 use crate::checksum::ChecksumTree;
 use crate::errors::ChecksumError;
 use crate::zarr::*;
-use log::{trace, warn};
 use std::iter::from_fn;
 use std::num::NonZeroUsize;
 use std::sync::mpsc::channel;
@@ -30,17 +29,15 @@ pub fn fastio_checksum_tree(
         let stack = Arc::clone(&stack);
         let sender = sender.clone();
         thread::spawn(move || {
-            trace!("[{thread_no}] Starting thread");
+            log::trace!("[{thread_no}] Starting thread");
             for entry in from_fn(|| stack.pop()) {
-                trace!("[{thread_no}] Popped {:?} from stack", entry);
+                log::trace!("[{thread_no}] Popped {:?} from stack", entry);
                 let output = match entry {
                     ZarrEntry::Directory(zd) => match zd.entries() {
                         Ok(entries) => {
-                            stack.extend(
-                                entries
-                                    .into_iter()
-                                    .inspect(|n| trace!("[{thread_no}] Pushing {n:?} onto stack")),
-                            );
+                            stack.extend(entries.into_iter().inspect(|n| {
+                                log::trace!("[{thread_no}] Pushing {n:?} onto stack")
+                            }));
                             None
                         }
                         Err(e) => Some(Err(e)),
@@ -54,11 +51,11 @@ pub fn fastio_checksum_tree(
                         if v.is_err() {
                             stack.shutdown();
                         }
-                        trace!("[{thread_no}] Sending {v:?} to output");
+                        log::trace!("[{thread_no}] Sending {v:?} to output");
                         match sender.send(v) {
                             Ok(_) => (),
                             Err(_) => {
-                                warn!("[{thread_no}] Failed to send; exiting");
+                                log::warn!("[{thread_no}] Failed to send; exiting");
                                 stack.shutdown();
                                 return;
                             }
@@ -66,7 +63,7 @@ pub fn fastio_checksum_tree(
                     }
                 }
             }
-            trace!("[{thread_no}] Ending thread");
+            log::trace!("[{thread_no}] Ending thread");
         });
     }
     drop(sender);

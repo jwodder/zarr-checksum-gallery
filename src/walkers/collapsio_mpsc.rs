@@ -2,7 +2,6 @@ use super::jobstack::JobStack;
 use crate::checksum::nodes::*;
 use crate::errors::{ChecksumError, FSError};
 use crate::zarr::*;
-use log::{error, trace, warn};
 use std::iter::from_fn;
 use std::num::NonZeroUsize;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -28,7 +27,7 @@ impl Job {
         match self {
             Job::Entry(ZarrEntry::Directory(dir), parent) => match dir.entries() {
                 Ok(entries) => {
-                    trace!(
+                    log::trace!(
                         "[{thread_no}] Directory {:?} has {} entries to checksum",
                         dir.relpath(),
                         entries.len(),
@@ -38,7 +37,7 @@ impl Job {
                     to_push.extend(
                         entries
                             .into_iter()
-                            .inspect(|n| trace!("[{thread_no}] Pushing {n:?} onto stack"))
+                            .inspect(|n| log::trace!("[{thread_no}] Pushing {n:?} onto stack"))
                             .map(|n| Job::Entry(n, Some(sender.clone()))),
                     );
                     Output::ToPush(to_push)
@@ -94,9 +93,9 @@ pub fn collapsio_mpsc_checksum(
         let stack = Arc::clone(&stack);
         let sender = sender.clone();
         thread::spawn(move || {
-            trace!("[{thread_no}] Starting thread");
+            log::trace!("[{thread_no}] Starting thread");
             for entry in from_fn(|| stack.pop()) {
-                trace!("[{thread_no}] Popped {entry:?} from stack");
+                log::trace!("[{thread_no}] Popped {entry:?} from stack");
                 let out = entry.process(thread_no);
                 stack.job_done();
                 match out {
@@ -107,9 +106,9 @@ pub fn collapsio_mpsc_checksum(
                             if to_send.is_err() {
                                 stack.shutdown();
                             }
-                            trace!("[{thread_no}] Sending {to_send:?} to output");
+                            log::trace!("[{thread_no}] Sending {to_send:?} to output");
                             if sender.send(to_send).is_err() {
-                                warn!("[{thread_no}] Failed to send; exiting");
+                                log::warn!("[{thread_no}] Failed to send; exiting");
                                 stack.shutdown();
                                 return;
                             }
@@ -118,7 +117,7 @@ pub fn collapsio_mpsc_checksum(
                     Output::Nil => (),
                 }
             }
-            trace!("[{thread_no}] Ending thread");
+            log::trace!("[{thread_no}] Ending thread");
         });
     }
     drop(sender);
@@ -141,7 +140,7 @@ pub fn collapsio_mpsc_checksum(
         None => match chksum {
             Some(s) => Ok(s),
             None => {
-                error!("Neither checksum nor errors were received!");
+                log::error!("Neither checksum nor errors were received!");
                 panic!("Neither checksum nor errors were received!");
             }
         },
