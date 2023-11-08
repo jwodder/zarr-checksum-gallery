@@ -2,6 +2,7 @@ use super::jobstack::JobStack;
 use crate::checksum::nodes::*;
 use crate::errors::{ChecksumError, FSError};
 use crate::zarr::*;
+use crossbeam::sync::WaitGroup;
 use log::{error, trace, warn};
 use std::fmt;
 use std::iter::from_fn;
@@ -12,8 +13,8 @@ use std::thread;
 
 #[derive(Debug)]
 enum Job {
-    Entry(ZarrEntry, Option<Arc<Directory>>),
-    CompletedDir(Arc<Directory>),
+    Entry(ZarrEntry, Option<SharedDirectory>),
+    CompletedDir(SharedDirectory),
 }
 
 impl Job {
@@ -25,7 +26,7 @@ impl Job {
         match self {
             Job::Entry(ZarrEntry::Directory(zd), parent) => match zd.entries() {
                 Ok(entries) => {
-                    let arcdir = Arc::new(Directory::new(zd, entries.len(), parent));
+                    let arcdir = SharedDirectory::new(Directory::new(zd, entries.len(), parent));
                     if entries.is_empty() {
                         trace!(
                             "[{thread_no}] Directory {:?} is empty; pushing onto stack",
@@ -33,13 +34,11 @@ impl Job {
                         );
                         Output::ToPush(vec![Job::CompletedDir(arcdir)])
                     } else {
-                        let qty = entries.len();
                         Output::ToPush(
                             entries
                                 .into_iter()
                                 .inspect(|n| trace!("[{thread_no}] Pushing {n:?} onto stack"))
-                                .zip(arc_times_n(arcdir, qty))
-                                .map(|(n, arc)| Job::Entry(n, Some(arc)))
+                                .map(|n| Job::Entry(n, Some(arcdir.clone())))
                                 .collect(),
                         )
                     }
@@ -59,19 +58,21 @@ impl Job {
                     );
                     Output::ToPush(vec![Job::CompletedDir(parent)])
                 } else {
+                    // It is possible for the CPU to suspend the thread here
+                    // (and also on the `Nil` branch to the other call to
+                    // `add()` further down), before `parent` is dropped, and
+                    // then switch to another thread that finishes `parent` and
+                    // pushes its CompletedDir on the stack, where it is
+                    // immediately popped off the stack despite the `Arc` in
+                    // `parent` still having an outstanding "extra" strong
+                    // reference — hence the need for waiting for the strong
+                    // count to reach 1 with a WaitGroup.
                     Output::Nil
                 }
             }
             Job::CompletedDir(arcdir) => {
-                let dir = match Arc::try_unwrap(arcdir) {
-                    Ok(dir) => dir,
-                    Err(a) => {
-                        // TODO: Send an Err when this happens
-                        error!("Expected CompletedDir to have only one strong reference, but there were {}!", Arc::strong_count(&a));
-                        panic!("CompletedDir should have only one strong reference");
-                    }
-                };
-                let parent = dir.parent.as_ref().map(Arc::clone);
+                let dir = arcdir.unwrap();
+                let parent = dir.parent.as_ref().cloned();
                 let node = dir.checksum();
                 if let Some(parent) = parent {
                     if parent.add(node.into()) {
@@ -101,16 +102,11 @@ enum Output {
 struct Directory {
     dir: ZarrDirectory,
     data: Mutex<DirectoryData>,
-    parent: Option<Arc<Directory>>,
-}
-
-struct DirectoryData {
-    nodes: Vec<EntryChecksum>,
-    todo: usize,
+    parent: Option<SharedDirectory>,
 }
 
 impl Directory {
-    fn new(dir: ZarrDirectory, todo: usize, parent: Option<Arc<Directory>>) -> Directory {
+    fn new(dir: ZarrDirectory, todo: usize, parent: Option<SharedDirectory>) -> Directory {
         trace!(
             "Directory {:?} has {} entries to checksum",
             dir.relpath(),
@@ -148,6 +144,11 @@ impl Directory {
     }
 }
 
+struct DirectoryData {
+    nodes: Vec<EntryChecksum>,
+    todo: usize,
+}
+
 impl fmt::Debug for DirectoryData {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("DirectoryData")
@@ -157,10 +158,44 @@ impl fmt::Debug for DirectoryData {
     }
 }
 
+#[derive(Clone, Debug)]
+struct SharedDirectory {
+    data: Arc<Directory>,
+    wg: WaitGroup,
+}
+
+impl SharedDirectory {
+    fn new(dir: Directory) -> SharedDirectory {
+        SharedDirectory {
+            data: Arc::new(dir),
+            wg: WaitGroup::new(),
+        }
+    }
+
+    fn unwrap(self) -> Directory {
+        self.wg.wait();
+        match Arc::try_unwrap(self.data) {
+            Ok(dir) => dir,
+            Err(arcdir) => {
+                error!("Expected SharedDirectory to have only one strong reference, but there were {}!", Arc::strong_count(&arcdir));
+                panic!("SharedDirectory should have only one strong reference");
+            }
+        }
+    }
+}
+
+impl std::ops::Deref for SharedDirectory {
+    type Target = Directory;
+
+    fn deref(&self) -> &Directory {
+        &self.data
+    }
+}
+
 /// Traverse & checksum a Zarr directory using a stack of jobs distributed over
 /// multiple threads.  The checksum for each intermediate directory is computed
 /// as a job as soon as possible.  Checksums for directory entries are passed
-/// to parent jobs via shared memory implemented using `Arc<Mutex<...>>`.
+/// to parent jobs via shared memory implemented using `Arc` and `Mutex`.
 ///
 /// The `threads` argument determines the number of worker threads to use.
 pub fn collapsio_arc_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<String, ChecksumError> {
@@ -222,15 +257,4 @@ pub fn collapsio_arc_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<Stri
             }
         },
     }
-}
-
-fn arc_times_n<T>(arc: Arc<T>, n: usize) -> Vec<Arc<T>> {
-    let mut vec = Vec::with_capacity(n);
-    if let Some(m) = n.checked_sub(1) {
-        for _ in 0..m {
-            vec.push(arc.clone());
-        }
-        vec.push(arc);
-    }
-    vec
 }
