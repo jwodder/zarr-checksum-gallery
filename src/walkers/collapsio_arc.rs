@@ -126,12 +126,20 @@ impl Directory {
     }
 
     fn checksum(self) -> DirChecksum {
-        self.dir.get_checksum(self.data.into_inner().unwrap().nodes)
+        self.dir.get_checksum(
+            self.data
+                .into_inner()
+                .expect("Mutex should not have been poisoned")
+                .nodes,
+        )
     }
 
     /// Returns `true` if all to-dos are now done after adding
     fn add(&self, node: EntryChecksum) -> bool {
-        let mut data = self.data.lock().unwrap();
+        let mut data = self
+            .data
+            .lock()
+            .expect("Mutex should not have been poisoned");
         data.nodes.push(node);
         data.todo = data.todo.saturating_sub(1);
         log::trace!(
@@ -149,7 +157,7 @@ struct DirectoryData {
 }
 
 impl fmt::Debug for DirectoryData {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DirectoryData")
             .field("nodes", &format_args!("<{} nodes>", self.nodes.len()))
             .field("todo", &self.todo)
@@ -248,12 +256,13 @@ pub fn collapsio_arc_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<Stri
     }
     match err {
         Some(e) => Err(e.into()),
-        None => match chksum {
-            Some(s) => Ok(s),
-            None => {
+        None => {
+            if let Some(s) = chksum {
+                Ok(s)
+            } else {
                 log::error!("Neither checksum nor errors were received!");
                 panic!("Neither checksum nor errors were received!");
             }
-        },
+        }
     }
 }

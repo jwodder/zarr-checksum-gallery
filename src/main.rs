@@ -112,7 +112,7 @@ impl Arguments {
         };
         fern::Dispatch::new()
             .format(|out, message, record| {
-                out.finish(format_args!("[{:<5}] {}", record.level(), message))
+                out.finish(format_args!("[{:<5}] {}", record.level(), message));
             })
             .level(log_level)
             .chain(std::io::stderr())
@@ -144,9 +144,12 @@ impl Arguments {
                         .worker_threads(threads)
                         .enable_all()
                         .build()
-                        .unwrap()
+                        .expect("Buiding a multithreaded tokio runtime should not fail")
                 } else {
-                    Builder::new_current_thread().enable_all().build().unwrap()
+                    Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .expect("Buiding a single-threaded tokio runtime should not fail")
                 };
                 rt.block_on(fastasync_checksum(
                     &Zarr::new(dirpath).exclude_dotfiles(self.exclude_dotfiles),

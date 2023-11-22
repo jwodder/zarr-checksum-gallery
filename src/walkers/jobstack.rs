@@ -28,7 +28,10 @@ impl<T> JobStack<T> {
     }
 
     pub(crate) fn push(&self, item: T) {
-        let mut data = self.data.lock().unwrap();
+        let mut data = self
+            .data
+            .lock()
+            .expect("Mutex should not have been poisoned");
         if !data.shutdown {
             data.queue.push(item);
             data.jobs += 1;
@@ -39,7 +42,10 @@ impl<T> JobStack<T> {
 
     // We can't impl Extend, as that requires the receiver to be mut
     pub(crate) fn extend<I: IntoIterator<Item = T>>(&self, iter: I) {
-        let mut data = self.data.lock().unwrap();
+        let mut data = self
+            .data
+            .lock()
+            .expect("Mutex should not have been poisoned");
         if !data.shutdown {
             let prelen = data.queue.len();
             data.queue.extend(iter);
@@ -50,7 +56,10 @@ impl<T> JobStack<T> {
     }
 
     pub(crate) fn shutdown(&self) {
-        let mut data = self.data.lock().unwrap();
+        let mut data = self
+            .data
+            .lock()
+            .expect("Mutex should not have been poisoned");
         if !data.shutdown {
             log::trace!("[JobStack] Shutting down stack");
             data.jobs -= data.queue.len();
@@ -61,11 +70,17 @@ impl<T> JobStack<T> {
     }
 
     pub(crate) fn is_shutdown(&self) -> bool {
-        self.data.lock().unwrap().shutdown
+        self.data
+            .lock()
+            .expect("Mutex should not have been poisoned")
+            .shutdown
     }
 
     pub(crate) fn pop(&self) -> Option<T> {
-        let mut data = self.data.lock().unwrap();
+        let mut data = self
+            .data
+            .lock()
+            .expect("Mutex should not have been poisoned");
         loop {
             log::trace!("[JobStack] Looping through stack");
             if data.jobs == 0 || data.shutdown {
@@ -76,14 +91,20 @@ impl<T> JobStack<T> {
                 value @ Some(_) => return value,
                 None => {
                     log::trace!("[JobStack] queue is empty; waiting");
-                    data = self.cond.wait(data).unwrap();
+                    data = self
+                        .cond
+                        .wait(data)
+                        .expect("Mutex should not have been poisoned");
                 }
             }
         }
     }
 
     pub(crate) fn job_done(&self) {
-        let mut data = self.data.lock().unwrap();
+        let mut data = self
+            .data
+            .lock()
+            .expect("Mutex should not have been poisoned");
         data.jobs -= 1;
         log::trace!("[JobStack] Job count decremented to {}", data.jobs);
         if data.jobs == 0 {

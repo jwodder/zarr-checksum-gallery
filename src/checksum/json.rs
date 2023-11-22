@@ -32,7 +32,7 @@ struct JSONEntry<'a> {
     size: u64,
 }
 
-impl<'a> JSONEntry<'a> {
+impl JSONEntry<'_> {
     fn write_json<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_str(r#"{"digest":"#)?;
         write_json_str(self.digest, writer)?;
@@ -69,7 +69,7 @@ struct JSONEntryCollection<'a> {
     files: Vec<JSONEntry<'a>>,
 }
 
-impl<'a> JSONEntryCollection<'a> {
+impl JSONEntryCollection<'_> {
     fn write_json<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         writer.write_str(r#"{"directories":["#)?;
         for (i, d) in self.directories.iter().enumerate() {
@@ -85,7 +85,7 @@ impl<'a> JSONEntryCollection<'a> {
             }
             f.write_json(writer)?;
         }
-        writer.write_str(r#"]}"#)?;
+        writer.write_str("]}")?;
         Ok(())
     }
 }

@@ -25,7 +25,7 @@ pub(crate) fn md5_file<P: AsRef<Path>>(path: P) -> Result<String, FSError> {
 
 /// Compute the MD5 hash of the contents of the given file asynchronously,
 /// returning a string of lowercase hexadecimal digits
-pub(crate) async fn async_md5_file<P: AsRef<Path>>(path: P) -> Result<String, FSError> {
+pub(crate) async fn async_md5_file<P: AsRef<Path> + Send>(path: P) -> Result<String, FSError> {
     let path = path.as_ref();
     let mut fp = TokioFile::open(path).await?;
     let mut hasher = Md5::new();

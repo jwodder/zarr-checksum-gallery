@@ -9,9 +9,10 @@ pub struct EntryPath(Vec<String>);
 impl EntryPath {
     /// Return the basename of the path
     pub fn file_name(&self) -> &str {
-        self.0
-            .last()
-            .expect("Invariant violated: EntryPath is empty")
+        let Some(name) = self.0.last() else {
+            unreachable!("Invariant violated: EntryPath is empty");
+        };
+        name
     }
 
     /// Return an iterator over the parent paths of the path, starting at the
@@ -46,7 +47,7 @@ impl EntryPath {
 }
 
 impl fmt::Debug for EntryPath {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("\"")?;
         for (i, part) in self.0.iter().enumerate() {
             if i > 0 {
@@ -60,7 +61,7 @@ impl fmt::Debug for EntryPath {
 }
 
 impl fmt::Display for EntryPath {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (i, part) in self.0.iter().enumerate() {
             if i > 0 {
                 f.write_str("/")?;
@@ -106,21 +107,20 @@ impl TryFrom<&str> for EntryPath {
 /// The iterator's items are themselves [`EntryPath`]s.
 ///
 /// This struct is returned by [`EntryPath::parents()`].
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Parents<'a> {
     parts: &'a Vec<String>,
     i: usize,
 }
 
-impl<'a> Iterator for Parents<'a> {
+impl Iterator for Parents<'_> {
     type Item = EntryPath;
 
     fn next(&mut self) -> Option<EntryPath> {
-        if self.i + 1 < self.parts.len() {
+        (self.i + 1 < self.parts.len()).then(|| {
             self.i += 1;
-            Some(EntryPath(self.parts[0..self.i].to_vec()))
-        } else {
-            None
-        }
+            EntryPath(self.parts[0..self.i].to_vec())
+        })
     }
 }
 

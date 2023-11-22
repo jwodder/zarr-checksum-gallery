@@ -1,3 +1,6 @@
+#![cfg(test)]
+#![allow(clippy::unnecessary_wraps)]
+#![allow(clippy::future_not_send)]
 use assert_matches::assert_matches;
 use cfg_if::cfg_if;
 use fs_extra::dir;
@@ -24,6 +27,9 @@ static SAMPLE_ZARR_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data
 
 static SAMPLE_CHECKSUM: &str = "4313ab36412db2981c3ed391b38604d6-5--1516";
 
+// The TempDir field of SubTemporary is never read, but it needs to be kept
+// alive to delay dropping the TempDir.
+#[allow(unused_tuple_struct_fields)]
 enum Input {
     Permanent(PathBuf),
     Temporary(TempDir),
@@ -113,7 +119,7 @@ fn file_arg() -> Option<TestCase> {
             //assert_eq!(source.kind(), std::io::ErrorKind::NotADirectory);
             let msg = source.to_string();
             assert!(msg.starts_with(&format!("failed to read directory `{}`", path.display())), "IO error message: {msg:?}");
-        })
+        });
     };
     Some(TestCase {
         input: Input::TempFile(tmpfile),
@@ -262,7 +268,7 @@ fn unreadable_file() -> Option<TestCase> {
         assert_matches!(e, ChecksumError::FSError(FSError::Io(source)) => {
             let msg = source.to_string();
             assert!(msg.starts_with(&format!("failed to open file `{}`", path.display())), "IO error message: {msg:?}");
-        })
+        });
     };
     Some(TestCase {
         input: Input::Temporary(tmp_path),
@@ -309,7 +315,7 @@ fn bad_filename() -> Option<TestCase> {
     let checker = move |e| {
         assert_matches!(e, ChecksumError::FSError(FSError::UndecodableName { path: epath }) => {
             assert_eq!(path, epath);
-        })
+        });
     };
     Some(TestCase {
         input: Input::Temporary(tmp_path),
@@ -333,7 +339,7 @@ fn bad_dirname() -> Option<TestCase> {
     let checker = move |e| {
         assert_matches!(e, ChecksumError::FSError(FSError::UndecodableName { path: epath }) => {
             assert_eq!(epath, badpath);
-        })
+        });
     };
     Some(TestCase {
         input: Input::Temporary(tmp_path),
@@ -438,15 +444,14 @@ async fn test_fastasync_checksum(#[case] case: Option<TestCase>) {
 #[apply(test_cases)]
 fn test_collapsio_arc_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        if fern::Dispatch::new()
+        let lg = fern::Dispatch::new()
             .format(|out, message, record| {
-                out.finish(format_args!("[{:<5}] {}", record.level(), message))
+                out.finish(format_args!("[{:<5}] {}", record.level(), message));
             })
             .level(log::LevelFilter::Trace)
             .chain(std::io::stderr())
-            .apply()
-            .is_err()
-        {
+            .apply();
+        if lg.is_err() {
             log::set_max_level(log::LevelFilter::Trace);
         }
         let r = collapsio_arc_checksum(&case.zarr(), available_parallelism().unwrap());
@@ -458,15 +463,14 @@ fn test_collapsio_arc_checksum(#[case] case: Option<TestCase>) {
 #[apply(test_cases)]
 fn test_collapsio_mpsc_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        if fern::Dispatch::new()
+        let lg = fern::Dispatch::new()
             .format(|out, message, record| {
-                out.finish(format_args!("[{:<5}] {}", record.level(), message))
+                out.finish(format_args!("[{:<5}] {}", record.level(), message));
             })
             .level(log::LevelFilter::Trace)
             .chain(std::io::stderr())
-            .apply()
-            .is_err()
-        {
+            .apply();
+        if lg.is_err() {
             log::set_max_level(log::LevelFilter::Trace);
         }
         let r = collapsio_mpsc_checksum(&case.zarr(), available_parallelism().unwrap());

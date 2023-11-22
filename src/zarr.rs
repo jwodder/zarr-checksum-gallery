@@ -138,7 +138,7 @@ impl ZarrDirectory {
                 })
             } else {
                 ZarrEntry::File(ZarrFile { path, relpath })
-            })
+            });
         }
         Ok(entries)
     }
@@ -147,7 +147,10 @@ impl ZarrDirectory {
         let relpath = match &self.relpath {
             // TODO: Replace this kludgy workaround with something better:
             DirPath::Root => {
-                EntryPath::try_from("<root>").expect("<root> should be a valid EntryPath")
+                let Ok(ep) = EntryPath::try_from("<root>") else {
+                    unreachable!("<root> should be a valid EntryPath");
+                };
+                ep
             }
             DirPath::Path(ep) => ep.clone(),
         };
@@ -171,6 +174,7 @@ impl ZarrDirectory {
     }
 }
 
+#[derive(Debug)]
 pub struct Entries {
     handle: ReadDir,
     baserelpath: DirPath,
@@ -258,7 +262,7 @@ impl DirPath {
 }
 
 impl fmt::Display for DirPath {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DirPath::Root => f.write_str("<root>"),
             DirPath::Path(ep) => <EntryPath as fmt::Display>::fmt(ep, f),

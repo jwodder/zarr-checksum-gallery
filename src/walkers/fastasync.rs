@@ -19,7 +19,7 @@ struct AsyncJobStackData<T> {
     shutdown: bool,
 }
 
-impl<T> AsyncJobStack<T> {
+impl<T: Send> AsyncJobStack<T> {
     fn new<I: IntoIterator<Item = T>>(items: I) -> Self {
         let queue: Vec<T> = items.into_iter().collect();
         let jobs = queue.len();
@@ -35,7 +35,7 @@ impl<T> AsyncJobStack<T> {
 
     /*
     fn push(&self, item: T) {
-        let mut data = self.data.lock().unwrap();
+        let mut data = self.data.lock().expect("Mutex should not have been poisoned");
         if !data.shutdown {
             data.queue.push(item);
             data.jobs += 1;
@@ -46,7 +46,10 @@ impl<T> AsyncJobStack<T> {
     */
 
     fn extend<I: IntoIterator<Item = T>>(&self, iter: I) {
-        let mut data = self.data.lock().unwrap();
+        let mut data = self
+            .data
+            .lock()
+            .expect("Mutex should not have been poisoned");
         if !data.shutdown {
             let prelen = data.queue.len();
             data.queue.extend(iter);
@@ -57,7 +60,10 @@ impl<T> AsyncJobStack<T> {
     }
 
     fn shutdown(&self) {
-        let mut data = self.data.lock().unwrap();
+        let mut data = self
+            .data
+            .lock()
+            .expect("Mutex should not have been poisoned");
         if !data.shutdown {
             log::trace!("Shutting down stack");
             data.jobs -= data.queue.len();
@@ -68,14 +74,20 @@ impl<T> AsyncJobStack<T> {
     }
 
     fn is_shutdown(&self) -> bool {
-        self.data.lock().unwrap().shutdown
+        self.data
+            .lock()
+            .expect("Mutex should not have been poisoned")
+            .shutdown
     }
 
     async fn pop(&self) -> Option<T> {
         loop {
             log::trace!("Looping through pop()");
             {
-                let mut data = self.data.lock().unwrap();
+                let mut data = self
+                    .data
+                    .lock()
+                    .expect("Mutex should not have been poisoned");
                 if data.jobs == 0 || data.shutdown {
                     log::trace!("[pop] no jobs; returning None");
                     return None;
@@ -90,7 +102,10 @@ impl<T> AsyncJobStack<T> {
     }
 
     fn job_done(&self) {
-        let mut data = self.data.lock().unwrap();
+        let mut data = self
+            .data
+            .lock()
+            .expect("Mutex should not have been poisoned");
         data.jobs -= 1;
         log::trace!("Job count decremented to {}", data.jobs);
         if data.jobs == 0 {
@@ -119,19 +134,18 @@ pub async fn fastasync_checksum(
             log::trace!("[{task_no}] Starting worker");
             while let Some(entry) = stack.pop().await {
                 log::trace!("[{task_no}] Popped {:?} from stack", entry);
-                let output =
-                    match entry {
-                        ZarrEntry::Directory(zd) => match zd.async_entries().await {
-                            Ok(entries) => {
-                                stack.extend(entries.into_iter().inspect(|n| {
-                                    log::trace!("[{task_no}] Pushing {n:?} onto stack")
-                                }));
-                                None
-                            }
-                            Err(e) => Some(Err(e)),
-                        },
-                        ZarrEntry::File(zf) => Some(zf.async_into_checksum().await),
-                    };
+                let output = match entry {
+                    ZarrEntry::Directory(zd) => match zd.async_entries().await {
+                        Ok(entries) => {
+                            stack.extend(entries.into_iter().inspect(|n| {
+                                log::trace!("[{task_no}] Pushing {n:?} onto stack");
+                            }));
+                            None
+                        }
+                        Err(e) => Some(Err(e)),
+                    },
+                    ZarrEntry::File(zf) => Some(zf.async_into_checksum().await),
+                };
                 stack.job_done();
                 if let Some(v) = output {
                     // If we've shut down, don't send anything except Errs
@@ -140,13 +154,10 @@ pub async fn fastasync_checksum(
                             stack.shutdown();
                         }
                         log::trace!("[{task_no}] Sending {v:?} to output");
-                        match sender.send(v).await {
-                            Ok(_) => (),
-                            Err(_) => {
-                                log::warn!("[{task_no}] Failed to send; exiting");
-                                stack.shutdown();
-                                return;
-                            }
+                        if sender.send(v).await.is_err() {
+                            log::warn!("[{task_no}] Failed to send; exiting");
+                            stack.shutdown();
+                            return;
                         }
                     }
                 }

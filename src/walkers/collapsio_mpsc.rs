@@ -137,12 +137,13 @@ pub fn collapsio_mpsc_checksum(
     }
     match err {
         Some(e) => Err(e.into()),
-        None => match chksum {
-            Some(s) => Ok(s),
-            None => {
+        None => {
+            if let Some(s) = chksum {
+                Ok(s)
+            } else {
                 log::error!("Neither checksum nor errors were received!");
                 panic!("Neither checksum nor errors were received!");
             }
-        },
+        }
     }
 }

@@ -31,11 +31,10 @@ enum TreeNode {
 impl ChecksumTree {
     /// Create a new `ChecksumTree`
     pub fn new() -> Self {
-        ChecksumTree(DirTree::new(
-            "<root>"
-                .try_into()
-                .expect("<root> should be avalid EntryPath"),
-        ))
+        let Ok(ep) = EntryPath::try_from("<root>") else {
+            unreachable!("<root> should be a valid EntryPath");
+        };
+        ChecksumTree(DirTree::new(ep))
     }
 
     /// Compute the Zarr checksum for the entire tree
@@ -91,7 +90,7 @@ impl ChecksumTree {
             ..
         } = tree
         else {
-            panic!("Root of termtree::Tree should be a directory");
+            unreachable!("Root of termtree::Tree should be a directory");
         };
         termtree::Tree::new(TermTreeNode::Root { checksum }).with_leaves(leaves)
     }
@@ -186,7 +185,7 @@ pub enum TermTreeNode {
 }
 
 impl fmt::Display for TermTreeNode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use TermTreeNode::*;
         match self {
             Root { checksum } => write!(f, "{checksum}"),

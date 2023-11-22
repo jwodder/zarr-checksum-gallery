@@ -36,7 +36,7 @@ pub fn fastio_checksum_tree(
                     ZarrEntry::Directory(zd) => match zd.entries() {
                         Ok(entries) => {
                             stack.extend(entries.into_iter().inspect(|n| {
-                                log::trace!("[{thread_no}] Pushing {n:?} onto stack")
+                                log::trace!("[{thread_no}] Pushing {n:?} onto stack");
                             }));
                             None
                         }
@@ -52,13 +52,10 @@ pub fn fastio_checksum_tree(
                             stack.shutdown();
                         }
                         log::trace!("[{thread_no}] Sending {v:?} to output");
-                        match sender.send(v) {
-                            Ok(_) => (),
-                            Err(_) => {
-                                log::warn!("[{thread_no}] Failed to send; exiting");
-                                stack.shutdown();
-                                return;
-                            }
+                        if sender.send(v).is_err() {
+                            log::warn!("[{thread_no}] Failed to send; exiting");
+                            stack.shutdown();
+                            return;
                         }
                     }
                 }
