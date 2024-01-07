@@ -29,12 +29,11 @@ static SAMPLE_CHECKSUM: &str = "4313ab36412db2981c3ed391b38604d6-5--1516";
 
 // The TempDir field of SubTemporary is never read, but it needs to be kept
 // alive to delay dropping the TempDir.
-#[allow(unused_tuple_struct_fields)]
 enum Input {
     Permanent(PathBuf),
     Temporary(TempDir),
     TempFile(NamedTempFile),
-    SubTemporary(TempDir, PathBuf),
+    SubTemporary { _tmpdir: TempDir, path: PathBuf },
 }
 
 enum Expected {
@@ -54,7 +53,9 @@ impl TestCase {
             Input::Permanent(path) => Zarr::new(path).exclude_dotfiles(self.exclude_dotfiles),
             Input::Temporary(dir) => Zarr::new(dir.path()).exclude_dotfiles(self.exclude_dotfiles),
             Input::TempFile(f) => Zarr::new(f.path()).exclude_dotfiles(self.exclude_dotfiles),
-            Input::SubTemporary(_, path) => Zarr::new(path).exclude_dotfiles(self.exclude_dotfiles),
+            Input::SubTemporary { path, .. } => {
+                Zarr::new(path).exclude_dotfiles(self.exclude_dotfiles)
+            }
         }
     }
 
@@ -151,7 +152,10 @@ fn file_symlink() -> Option<TestCase> {
         }
     }
     Some(TestCase {
-        input: Input::SubTemporary(tmp_path, path),
+        input: Input::SubTemporary {
+            _tmpdir: tmp_path,
+            path,
+        },
         expected: Expected::Checksum(SAMPLE_CHECKSUM),
         exclude_dotfiles: false,
     })
@@ -180,7 +184,10 @@ fn dir_symlink() -> Option<TestCase> {
         }
     }
     Some(TestCase {
-        input: Input::SubTemporary(tmp_path, path),
+        input: Input::SubTemporary {
+            _tmpdir: tmp_path,
+            path,
+        },
         expected: Expected::Checksum(SAMPLE_CHECKSUM),
         exclude_dotfiles: false,
     })
@@ -208,7 +215,10 @@ fn zarr_symlink() -> Option<TestCase> {
         }
     }
     Some(TestCase {
-        input: Input::SubTemporary(tmp_path, path),
+        input: Input::SubTemporary {
+            _tmpdir: tmp_path,
+            path,
+        },
         expected: Expected::Checksum(SAMPLE_CHECKSUM),
         exclude_dotfiles: false,
     })
@@ -364,7 +374,10 @@ fn bad_basedir() -> Option<TestCase> {
         return None;
     }
     Some(TestCase {
-        input: Input::SubTemporary(tmp_path, path),
+        input: Input::SubTemporary {
+            _tmpdir: tmp_path,
+            path,
+        },
         expected: Expected::Checksum(SAMPLE_CHECKSUM),
         exclude_dotfiles: false,
     })
