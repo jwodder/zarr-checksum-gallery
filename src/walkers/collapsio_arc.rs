@@ -2,7 +2,7 @@ use super::jobstack::JobStack;
 use crate::checksum::nodes::*;
 use crate::errors::{ChecksumError, FSError};
 use crate::zarr::*;
-use crossbeam::sync::WaitGroup;
+use crossbeam_utils::sync::WaitGroup;
 use std::fmt;
 use std::iter::from_fn;
 use std::num::NonZeroUsize;
