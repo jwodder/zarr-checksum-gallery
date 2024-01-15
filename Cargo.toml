@@ -11,7 +11,7 @@ publish = false
 
 [dependencies]
 bytes = "1.5.0"
-clap = { version = "4.4.14", default-features = false, features = ["derive", "error-context", "help", "std", "suggestions", "usage", "wrap_help"] }
+clap = { version = "4.4.16", default-features = false, features = ["derive", "error-context", "help", "std", "suggestions", "usage", "wrap_help"] }
 crossbeam-utils = "0.8.19"
 enum_dispatch = "0.3.12"
 fern = "0.6.2"
