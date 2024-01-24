@@ -1,4 +1,0 @@
-[env]
-# So that the logging config for the collapsio tests (needed in order to
-# diagnose race conditions) doesn't step on its own feet:
-RUST_TEST_THREADS = "1"

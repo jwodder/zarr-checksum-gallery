@@ -457,18 +457,7 @@ async fn test_fastasync_checksum(#[case] case: Option<TestCase>) {
 #[apply(test_cases)]
 fn test_collapsio_arc_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let lg = fern::Dispatch::new()
-            .format(|out, message, record| {
-                out.finish(format_args!("[{:<5}] {}", record.level(), message));
-            })
-            .level(log::LevelFilter::Trace)
-            .chain(std::io::stderr())
-            .apply();
-        if lg.is_err() {
-            log::set_max_level(log::LevelFilter::Trace);
-        }
         let r = collapsio_arc_checksum(&case.zarr(), available_parallelism().unwrap());
-        log::set_max_level(log::LevelFilter::Off);
         case.check(r);
     }
 }
@@ -476,18 +465,7 @@ fn test_collapsio_arc_checksum(#[case] case: Option<TestCase>) {
 #[apply(test_cases)]
 fn test_collapsio_mpsc_checksum(#[case] case: Option<TestCase>) {
     if let Some(case) = case {
-        let lg = fern::Dispatch::new()
-            .format(|out, message, record| {
-                out.finish(format_args!("[{:<5}] {}", record.level(), message));
-            })
-            .level(log::LevelFilter::Trace)
-            .chain(std::io::stderr())
-            .apply();
-        if lg.is_err() {
-            log::set_max_level(log::LevelFilter::Trace);
-        }
         let r = collapsio_mpsc_checksum(&case.zarr(), available_parallelism().unwrap());
-        log::set_max_level(log::LevelFilter::Off);
         case.check(r);
     }
 }

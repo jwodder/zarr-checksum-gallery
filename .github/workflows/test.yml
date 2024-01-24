@@ -61,7 +61,7 @@ jobs:
         run: cargo build --all-targets --verbose
 
       - name: Test crate
-        run: cargo test --verbose -- --nocapture --test-threads 1
+        run: cargo test --verbose
 
   coverage:
     # This is separate from the main tests because cargo-llvm-cov doesn't run
