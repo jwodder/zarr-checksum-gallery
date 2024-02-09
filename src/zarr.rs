@@ -291,7 +291,10 @@ mod test {
 
     #[test]
     fn test_excluded_dotfiles_is_sorted() {
-        assert!(EXCLUDED_DOTFILES.windows(2).all(|ab| ab[0] < ab[1]));
+        assert!(EXCLUDED_DOTFILES.windows(2).all(|ab| {
+            assert!(ab.len() >= 2);
+            ab[0] < ab[1]
+        }));
     }
 
     #[rstest]
