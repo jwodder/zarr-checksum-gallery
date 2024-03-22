@@ -31,6 +31,7 @@ pub trait Checksum {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct FileChecksum {
     pub(super) relpath: EntryPath,
+    /// The MD5 digest (in lowercase hexadecimal) of the file's contents
     pub(super) checksum: String,
     pub(super) size: u64,
 }
@@ -75,6 +76,7 @@ impl Checksum for FileChecksum {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DirChecksum {
     pub(super) relpath: EntryPath,
+    /// A Zarr directory checksum of the form `{md5_hash}-{file_count}-{size}`
     pub(super) checksum: String,
     pub(super) size: u64,
     pub(super) file_count: u64,
