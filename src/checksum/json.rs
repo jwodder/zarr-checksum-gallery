@@ -136,7 +136,7 @@ mod test {
 
     #[test]
     fn test_get_checksum_json() {
-        let files = vec![
+        let files = [
             FileChecksum {
                 relpath: "foo".try_into().unwrap(),
                 checksum: "0123456789abcdef0123456789abcdef".into(),
@@ -164,7 +164,7 @@ mod test {
     #[test]
     fn test_get_checksum_json_empty_dir() {
         let files = Vec::new();
-        let directories = vec![DirChecksum {
+        let directories = [DirChecksum {
             relpath: "quux".try_into().unwrap(),
             checksum: "481a2f77ab786a0f45aafd5db0971caa-0--0".into(),
             size: 0,
