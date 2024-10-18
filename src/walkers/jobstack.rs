@@ -87,15 +87,14 @@ impl<T> JobStack<T> {
                 log::trace!("[JobStack] no jobs; returning None");
                 return None;
             }
-            match data.queue.pop() {
-                value @ Some(_) => return value,
-                None => {
-                    log::trace!("[JobStack] queue is empty; waiting");
-                    data = self
-                        .cond
-                        .wait(data)
-                        .expect("Mutex should not have been poisoned");
-                }
+            if let value @ Some(_) = data.queue.pop() {
+                return value;
+            } else {
+                log::trace!("[JobStack] queue is empty; waiting");
+                data = self
+                    .cond
+                    .wait(data)
+                    .expect("Mutex should not have been poisoned");
             }
         }
     }
