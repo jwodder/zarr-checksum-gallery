@@ -15,7 +15,7 @@ clap = { version = "4.5.4", default-features = false, features = ["derive", "err
 crossbeam-utils = "0.8.19"
 enum_dispatch = "0.3.13"
 fern = "0.7.0"
-fs-err = { version = "2.11.0", features = ["tokio"] }
+fs-err = { version = "3.0.0", features = ["tokio"] }
 hex = "0.4.3"
 log = "0.4.21"
 md-5 = "0.10.6"
