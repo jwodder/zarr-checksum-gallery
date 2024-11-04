@@ -14,7 +14,7 @@ bytes = "1.6.0"
 clap = { version = "4.5.4", default-features = false, features = ["derive", "error-context", "help", "std", "suggestions", "usage", "wrap_help"] }
 crossbeam-utils = "0.8.19"
 enum_dispatch = "0.3.13"
-fern = "0.6.2"
+fern = "0.7.0"
 fs-err = { version = "2.11.0", features = ["tokio"] }
 hex = "0.4.3"
 log = "0.4.21"
