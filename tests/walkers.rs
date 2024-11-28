@@ -116,8 +116,7 @@ fn file_arg() -> Option<TestCase> {
     let path = tmpfile.path().to_path_buf();
     let checker = move |e| {
         assert_matches!(e, ChecksumError::FSError(FSError::Io(source)) => {
-            // Unstable:
-            //assert_eq!(source.kind(), std::io::ErrorKind::NotADirectory);
+            assert_eq!(source.kind(), std::io::ErrorKind::NotADirectory);
             let msg = source.to_string();
             assert!(msg.starts_with(&format!("failed to read directory `{}`", path.display())), "IO error message: {msg:?}");
         });
