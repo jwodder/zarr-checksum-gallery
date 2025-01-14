@@ -89,12 +89,9 @@ fn mksamplecopy() -> TempDir {
 
 fn sample2() -> Option<TestCase> {
     let tmp_path = mksamplecopy();
-    let mut path = PathBuf::from(tmp_path.path());
-    path.push("arr_2");
+    let path = tmp_path.path().join("arr_2");
     fs::create_dir_all(path).unwrap();
-    let mut path = PathBuf::from(tmp_path.path());
-    path.push("arr_3");
-    path.push("foo");
+    let path = tmp_path.path().join("arr_3").join("foo");
     fs::create_dir_all(path).unwrap();
     Some(TestCase {
         input: Input::Temporary(tmp_path),
@@ -268,9 +265,7 @@ fn unexcluded_dotfiles() -> Option<TestCase> {
 #[cfg(unix)]
 fn unreadable_file() -> Option<TestCase> {
     let tmp_path = mksamplecopy();
-    let mut path = PathBuf::from(tmp_path.path());
-    path.push("arr_0");
-    path.push("unreadable");
+    let path = tmp_path.path().join("arr_0").join("unreadable");
     fs::write(&path, "You will never see this.\n").unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
     let checker = move |e| {
@@ -289,9 +284,7 @@ fn unreadable_file() -> Option<TestCase> {
 #[cfg(unix)]
 fn unreadable_dir() -> Option<TestCase> {
     let tmp_path = mksamplecopy();
-    let mut path = PathBuf::from(tmp_path.path());
-    path.push("arr_0");
-    path.push("unreadable");
+    let path = tmp_path.path().join("arr_0").join("unreadable");
     fs::create_dir(&path).unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
     let checker = move |e| {
