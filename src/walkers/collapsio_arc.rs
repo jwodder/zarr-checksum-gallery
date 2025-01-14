@@ -71,7 +71,7 @@ impl Job {
             }
             Job::CompletedDir(arcdir) => {
                 let dir = arcdir.unwrap();
-                let parent = dir.parent.as_ref().cloned();
+                let parent = dir.parent.clone();
                 let node = dir.checksum();
                 if let Some(parent) = parent {
                     if parent.add(node.into()) {
