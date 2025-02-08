@@ -1,6 +1,8 @@
+use super::util::Output;
 use crate::checksum::ChecksumTree;
 use crate::errors::ChecksumError;
 use crate::zarr::*;
+use std::future::Future;
 use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::channel;
@@ -32,18 +34,6 @@ impl<T: Send> AsyncJobStack<T> {
             cond: Notify::new(),
         }
     }
-
-    /*
-    fn push(&self, item: T) {
-        let mut data = self.data.lock().expect("Mutex should not have been poisoned");
-        if !data.shutdown {
-            data.queue.push(item);
-            data.jobs += 1;
-            log::trace!("Job count incremented to {}", data.jobs);
-            self.cond.notify_one();
-        }
-    }
-    */
 
     fn extend<I: IntoIterator<Item = T>>(&self, iter: I) {
         let mut data = self
@@ -78,6 +68,28 @@ impl<T: Send> AsyncJobStack<T> {
             .lock()
             .expect("Mutex should not have been poisoned")
             .shutdown
+    }
+
+    async fn handle_many_jobs<F, Fut, I, E>(&self, f: F) -> Result<(), E>
+    where
+        F: Fn(T) -> Fut + Send,
+        Fut: Future<Output = Result<I, E>> + Send,
+        I: IntoIterator<Item = T> + Send,
+    {
+        while let Some(value) = self.pop().await {
+            match f(value).await {
+                Ok(iter) => {
+                    self.extend(iter);
+                    self.job_done();
+                }
+                Err(e) => {
+                    self.job_done();
+                    self.shutdown();
+                    return Err(e);
+                }
+            }
+        }
+        Ok(())
     }
 
     async fn pop(&self) -> Option<T> {
@@ -128,41 +140,54 @@ pub async fn fastasync_checksum(
     let stack = Arc::new(AsyncJobStack::new([ZarrEntry::Directory(zarr.root_dir())]));
     let (sender, mut receiver) = channel(64);
     for task_no in 0..workers.get() {
-        let stack = Arc::clone(&stack);
-        let sender = sender.clone();
-        tokio::spawn(async move {
-            log::trace!("[{task_no}] Starting worker");
-            while let Some(entry) = stack.pop().await {
-                log::trace!("[{task_no}] Popped {:?} from stack", entry);
-                let output = match entry {
-                    ZarrEntry::Directory(zd) => match zd.async_entries().await {
-                        Ok(entries) => {
-                            stack.extend(entries.into_iter().inspect(|n| {
-                                log::trace!("[{task_no}] Pushing {n:?} onto stack");
-                            }));
-                            None
+        tokio::spawn({
+            let stack = Arc::clone(&stack);
+            let sender = sender.clone();
+            async move {
+                log::trace!("[{task_no}] Starting worker");
+                let _ = stack
+                    .handle_many_jobs(|entry| {
+                        let stack2 = stack.clone();
+                        let sender = sender.clone();
+                        async move {
+                            log::trace!("[{task_no}] Popped {:?} from stack", entry);
+                            let output = match entry {
+                                ZarrEntry::Directory(zd) => match zd.async_entries().await {
+                                    Ok(entries) => {
+                                        for n in &entries {
+                                            log::trace!("[{task_no}] Pushing {n:?} onto stack");
+                                        }
+                                        Output::ToPush(entries)
+                                    }
+                                    Err(e) => Output::ToSend(Err(e)),
+                                },
+                                ZarrEntry::File(zf) => {
+                                    Output::ToSend(zf.async_into_checksum().await)
+                                }
+                            };
+                            match output {
+                                Output::ToPush(to_push) => Ok(to_push),
+                                Output::ToSend(to_send) => {
+                                    // If we've shut down, don't send anything except Errs
+                                    if to_send.is_err() || !stack2.is_shutdown() {
+                                        if to_send.is_err() {
+                                            stack2.shutdown();
+                                        }
+                                        log::trace!("[{task_no}] Sending {to_send:?} to output");
+                                        if let Err(e) = sender.send(to_send).await {
+                                            log::warn!("[{task_no}] Failed to send; exiting");
+                                            return Err(e);
+                                        }
+                                    }
+                                    Ok(Vec::new())
+                                }
+                                Output::Nil => Ok(Vec::new()),
+                            }
                         }
-                        Err(e) => Some(Err(e)),
-                    },
-                    ZarrEntry::File(zf) => Some(zf.async_into_checksum().await),
-                };
-                stack.job_done();
-                if let Some(v) = output {
-                    // If we've shut down, don't send anything except Errs
-                    if v.is_err() || !stack.is_shutdown() {
-                        if v.is_err() {
-                            stack.shutdown();
-                        }
-                        log::trace!("[{task_no}] Sending {v:?} to output");
-                        if sender.send(v).await.is_err() {
-                            log::warn!("[{task_no}] Failed to send; exiting");
-                            stack.shutdown();
-                            return;
-                        }
-                    }
-                }
+                    })
+                    .await;
+                log::trace!("[{task_no}] Ending worker");
             }
-            log::trace!("[{task_no}] Ending worker");
         });
     }
     drop(sender);
