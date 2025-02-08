@@ -14,6 +14,7 @@ mod fastasync;
 mod fastio;
 mod jobstack;
 mod recursive;
+mod util;
 pub use breadth_first::*;
 pub use collapsio_arc::*;
 pub use collapsio_mpsc::*;

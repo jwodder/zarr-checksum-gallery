@@ -1,8 +1,8 @@
 use super::jobstack::JobStack;
+use super::util::Output;
 use crate::checksum::nodes::*;
-use crate::errors::{ChecksumError, FSError};
+use crate::errors::ChecksumError;
 use crate::zarr::*;
-use std::iter::from_fn;
 use std::num::NonZeroUsize;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
@@ -23,7 +23,7 @@ impl Job {
         Job::Entry(ZarrEntry::Directory(zarr.root_dir()), None)
     }
 
-    fn process(self, thread_no: usize) -> Output {
+    fn process(self, thread_no: usize) -> Output<Job, String> {
         match self {
             Job::Entry(ZarrEntry::Directory(dir), parent) => match dir.entries() {
                 Ok(entries) => {
@@ -71,12 +71,6 @@ impl Job {
     }
 }
 
-enum Output {
-    ToPush(Vec<Job>),
-    ToSend(Result<String, FSError>),
-    Nil,
-}
-
 /// Traverse & checksum a Zarr directory using a stack of jobs distributed over
 /// multiple threads.  The checksum for each intermediate directory is computed
 /// as a job as soon as possible.  Checksums for directory entries are passed
@@ -94,11 +88,10 @@ pub fn collapsio_mpsc_checksum(
         let sender = sender.clone();
         thread::spawn(move || {
             log::trace!("[{thread_no}] Starting thread");
-            for entry in from_fn(|| stack.pop()) {
+            let _ = stack.handle_many_jobs(|entry| {
                 log::trace!("[{thread_no}] Popped {entry:?} from stack");
-                let out = entry.process(thread_no);
-                match out {
-                    Output::ToPush(to_push) => stack.extend(to_push),
+                match entry.process(thread_no) {
+                    Output::ToPush(to_push) => Ok(to_push),
                     Output::ToSend(to_send) => {
                         // If we've shut down, don't send anything except Errs
                         if to_send.is_err() || !stack.is_shutdown() {
@@ -106,17 +99,16 @@ pub fn collapsio_mpsc_checksum(
                                 stack.shutdown();
                             }
                             log::trace!("[{thread_no}] Sending {to_send:?} to output");
-                            if sender.send(to_send).is_err() {
+                            if let Err(e) = sender.send(to_send) {
                                 log::warn!("[{thread_no}] Failed to send; exiting");
-                                stack.shutdown();
-                                return;
+                                return Err(e);
                             }
                         }
+                        Ok(Vec::new())
                     }
-                    Output::Nil => (),
+                    Output::Nil => Ok(Vec::new()),
                 }
-                stack.job_done();
-            }
+            });
             log::trace!("[{thread_no}] Ending thread");
         });
     }
