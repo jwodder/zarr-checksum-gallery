@@ -1,12 +1,13 @@
 #![allow(dead_code)]
-use std::ops::Deref;
 use std::sync::{Condvar, Mutex};
 
+#[derive(Debug)]
 pub(crate) struct JobStack<T> {
     data: Mutex<JobStackData<T>>,
     cond: Condvar,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct JobStackData<T> {
     queue: Vec<T>,
     jobs: usize,
@@ -27,32 +28,47 @@ impl<T> JobStack<T> {
         }
     }
 
-    pub(crate) fn push(&self, item: T) {
-        let mut data = self
-            .data
-            .lock()
-            .expect("Mutex should not have been poisoned");
-        if !data.shutdown {
-            data.queue.push(item);
-            data.jobs += 1;
-            log::trace!("[JobStack] Job count incremented to {}", data.jobs);
-            self.cond.notify_one();
+    pub(crate) fn handle_job<F, I, E>(&self, f: F) -> Result<bool, E>
+    where
+        F: FnOnce(T) -> Result<I, E>,
+        I: IntoIterator<Item = T>,
+    {
+        let Some(value) = self.pop() else {
+            return Ok(false);
+        };
+        match f(value) {
+            Ok(iter) => {
+                self.extend(iter);
+                self.job_done();
+                Ok(true)
+            }
+            Err(e) => {
+                self.job_done();
+                self.shutdown();
+                Err(e)
+            }
         }
     }
 
-    // We can't impl Extend, as that requires the receiver to be mut
-    pub(crate) fn extend<I: IntoIterator<Item = T>>(&self, iter: I) {
-        let mut data = self
-            .data
-            .lock()
-            .expect("Mutex should not have been poisoned");
-        if !data.shutdown {
-            let prelen = data.queue.len();
-            data.queue.extend(iter);
-            data.jobs += data.queue.len() - prelen;
-            log::trace!("[JobStack] Job count incremented to {}", data.jobs);
-            self.cond.notify_all();
+    pub(crate) fn handle_many_jobs<F, I, E>(&self, mut f: F) -> Result<(), E>
+    where
+        F: FnMut(T) -> Result<I, E>,
+        I: IntoIterator<Item = T>,
+    {
+        while let Some(value) = self.pop() {
+            match f(value) {
+                Ok(iter) => {
+                    self.extend(iter);
+                    self.job_done();
+                }
+                Err(e) => {
+                    self.job_done();
+                    self.shutdown();
+                    return Err(e);
+                }
+            }
         }
+        Ok(())
     }
 
     pub(crate) fn shutdown(&self) {
@@ -76,7 +92,7 @@ impl<T> JobStack<T> {
             .shutdown
     }
 
-    pub(crate) fn pop(&self) -> Option<T> {
+    fn pop(&self) -> Option<T> {
         let mut data = self
             .data
             .lock()
@@ -99,7 +115,7 @@ impl<T> JobStack<T> {
         }
     }
 
-    pub(crate) fn job_done(&self) {
+    fn job_done(&self) {
         let mut data = self
             .data
             .lock()
@@ -111,41 +127,18 @@ impl<T> JobStack<T> {
         }
     }
 
-    pub(crate) fn iter(&self) -> JobStackIterator<'_, T> {
-        JobStackIterator { stack: self }
-    }
-}
-
-pub(crate) struct JobStackIterator<'a, T> {
-    stack: &'a JobStack<T>,
-}
-
-impl<'a, T> Iterator for JobStackIterator<'a, T> {
-    type Item = JobStackItem<'a, T>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.stack.pop().map(|value| JobStackItem {
-            value,
-            stack: self.stack,
-        })
-    }
-}
-
-pub(crate) struct JobStackItem<'a, T> {
-    value: T,
-    stack: &'a JobStack<T>,
-}
-
-impl<T> Deref for JobStackItem<'_, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.value
-    }
-}
-
-impl<T> Drop for JobStackItem<'_, T> {
-    fn drop(&mut self) {
-        self.stack.job_done();
+    // We can't impl Extend, as that requires the receiver to be mut
+    fn extend<I: IntoIterator<Item = T>>(&self, iter: I) {
+        let mut data = self
+            .data
+            .lock()
+            .expect("Mutex should not have been poisoned");
+        if !data.shutdown {
+            let prelen = data.queue.len();
+            data.queue.extend(iter);
+            data.jobs += data.queue.len() - prelen;
+            log::trace!("[JobStack] Job count incremented to {}", data.jobs);
+            self.cond.notify_all();
+        }
     }
 }
