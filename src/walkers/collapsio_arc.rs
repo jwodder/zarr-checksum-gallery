@@ -216,7 +216,6 @@ pub fn collapsio_arc_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<Stri
             for entry in from_fn(|| stack.pop()) {
                 log::trace!("[{thread_no}] Popped {entry:?} from stack");
                 let out = entry.process(thread_no);
-                stack.job_done();
                 match out {
                     Output::ToPush(to_push) => stack.extend(to_push),
                     Output::ToSend(to_send) => {
@@ -235,6 +234,7 @@ pub fn collapsio_arc_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<Stri
                     }
                     Output::Nil => (),
                 }
+                stack.job_done();
             }
             log::trace!("[{thread_no}] Ending thread");
         });

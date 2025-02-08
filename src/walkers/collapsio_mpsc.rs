@@ -97,7 +97,6 @@ pub fn collapsio_mpsc_checksum(
             for entry in from_fn(|| stack.pop()) {
                 log::trace!("[{thread_no}] Popped {entry:?} from stack");
                 let out = entry.process(thread_no);
-                stack.job_done();
                 match out {
                     Output::ToPush(to_push) => stack.extend(to_push),
                     Output::ToSend(to_send) => {
@@ -116,6 +115,7 @@ pub fn collapsio_mpsc_checksum(
                     }
                     Output::Nil => (),
                 }
+                stack.job_done();
             }
             log::trace!("[{thread_no}] Ending thread");
         });
