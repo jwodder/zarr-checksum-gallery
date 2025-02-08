@@ -209,8 +209,7 @@ pub fn collapsio_arc_checksum(zarr: &Zarr, threads: NonZeroUsize) -> Result<Stri
             log::trace!("[{thread_no}] Starting thread");
             let _ = stack.handle_many_jobs(|entry| {
                 log::trace!("[{thread_no}] Popped {entry:?} from stack");
-                let out = entry.process(thread_no);
-                match out {
+                match entry.process(thread_no) {
                     Output::ToPush(to_push) => Ok(to_push),
                     Output::ToSend(to_send) => {
                         // If we've shut down, don't send anything except Errs
