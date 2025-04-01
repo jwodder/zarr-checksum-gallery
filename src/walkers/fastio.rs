@@ -31,7 +31,7 @@ pub fn fastio_checksum_tree(
         thread::spawn(move || {
             log::trace!("[{thread_no}] Starting thread");
             let _ = stack.handle_many_jobs(|entry| {
-                log::trace!("[{thread_no}] Popped {:?} from stack", entry);
+                log::trace!("[{thread_no}] Popped {entry:?} from stack");
                 let output = match entry {
                     ZarrEntry::Directory(zd) => match zd.entries() {
                         Ok(entries) => {

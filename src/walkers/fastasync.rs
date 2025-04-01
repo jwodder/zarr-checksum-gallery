@@ -150,7 +150,7 @@ pub async fn fastasync_checksum(
                         let stack2 = stack.clone();
                         let sender = sender.clone();
                         async move {
-                            log::trace!("[{task_no}] Popped {:?} from stack", entry);
+                            log::trace!("[{task_no}] Popped {entry:?} from stack");
                             let output = match entry {
                                 ZarrEntry::Directory(zd) => match zd.async_entries().await {
                                     Ok(entries) => {
